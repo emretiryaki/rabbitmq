@@ -36,7 +36,7 @@ type (
 	concurrentCount int
 	retryCount      int
 	sync.Mutex
-	uri             string
+	connection      *amqp.Connection
 	channel         *amqp.Channel
 }
 
@@ -66,14 +66,8 @@ func  ConcurrentCount(concurrentCount int)  HandleFunc{
 
 func (m messageBus) Publish(payload interface{},builders ...BuilderPublishFunc) error {
 
-	var conn,channel,err= createConnAndChan(m.uri)
-
-	defer  conn.Close()
-	defer  channel.Close()
-
-	if err!=nil{
-		panic(err)
-	}
+	m.createChannel()
+	defer  m.channel.Close()
 
 	var exchange = getExchangeName(payload)
 	_,isExist:=m.exchanges[exchange]
@@ -86,10 +80,10 @@ func (m messageBus) Publish(payload interface{},builders ...BuilderPublishFunc) 
 	var publishingMessage= convertPublishMessage(message)
 
 	if isExist {
-			return channel.Publish(exchange,"",false,false,publishingMessage)
+			return m.channel.Publish(exchange,"",false,false,publishingMessage)
 		}else{
 			m.createExchange(exchange,"")
-			return channel.Publish(exchange,"",false,false,publishingMessage)
+			return m.channel.Publish(exchange,"",false,false,publishingMessage)
 	}
 }
 
@@ -106,12 +100,11 @@ func (mb messageBus) Consume(queueName string,consumeMessage interface{},fn OnCo
 	if !isExistExchange {
 		mb.createExchange(exchangeName,"")
 	}
-
-
 	mb.createQueue(destinationExchange,queueName,"")
+	mb.createChannel()
 	mb.channel.ExchangeBind(destinationExchange,"",exchangeName,true,nil)
 	mb.createQueue(errorQueue,errorExchange,"")
-
+	mb.channel.Close()
 
 	consumerMessage,_:=mb.consumer.Consume(ConsumeSetting{arg:nil,isNoWait:false,isNoLocal:false,isExclusive:false,queueName:queueName,autoAck:false})
 
@@ -159,13 +152,15 @@ func (mb* messageBus) createQueue(destinationExchange string, queueName string, 
 	mb.channel.QueueBind(q.Name, routingKey, destinationExchange, false, nil)
 }
 
+
+
 func  (mb *messageBus) createExchange(exchange string,routingKey  string) error{
-	var err =mb.channel.ExchangeDeclare(exchange,exchangeType(routingKey),true,false,false,false,nil)
+	var err= mb.channel.ExchangeDeclare(exchange,exchangeType(routingKey),true,false,false,false,nil)
 	mb.exchanges[exchange]=exchange
 	if err!=nil{
 		return err
 	}
-	 return nil
+	return nil
 }
 
 
@@ -179,37 +174,30 @@ func exchangeType (routingKey string) string{
 	return exchangeType
 }
 
-func createConnAndChan(dsn string) (*amqp.Connection, *amqp.Channel, error) {
-	conn, err := amqp.Dial(dsn)
-	if err != nil {
-		return nil, nil, err
-	}
 
-	ch, err := conn.Channel()
-	if err != nil {
-		return nil, nil, err
-	}
+func createConn(dsn string) (*amqp.Connection) {
+	conn, _ := amqp.Dial(dsn)
+	return conn
+}
 
-	return conn, ch, nil
+func (m* messageBus	) createChannel() (error) {
+	var channel,err=m.connection.Channel()
+	m.channel=channel
+	return  err
 }
 
 func CreateUsingRabbitMq(uri string,handlefunceList ...HandleFunc) (MessageBus) {
 
 	oncebus.Do(func() {
+		var conn =createConn(uri)
 
-		var _,channel,_= createConnAndChan(uri)
 		messageBusInstance = &messageBus{
-			uri:uri,
 			concurrentCount:concurrentCount,
 			retryCount:retryCount,
-			consumer:NewInstanceConsume(channel),
 			queues:make(map[string]string),
 			exchanges:make(map[string]string),
-			channel:channel,
-
-
+			connection:conn,
 		}
-
 		for _, handler:= range handlefunceList {
 			if  err:= handler(messageBusInstance);err!=nil{
 				panic(err)

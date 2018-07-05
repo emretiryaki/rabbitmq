@@ -29,32 +29,21 @@ type (
 
 func main(){
 
-	var messageBus=rabbit.CreateUsingRabbitMq("amqp://guest:guest@localhost:5672/",rabbit.ConcurrentCount(1))
+	var messageBus=rabbit.CreateUsingRabbitMq("amqp://guest:guest@localhost:5672/", rabbit.RetryCount(2))
 
-	go func(){
+	onConsumed := func(message rabbit.Message) error {
 
-		onConsumed := func(message rabbit.Message) error {
-			var consumeMessage PersonV1
-			var err =json.Unmarshal(message.Payload, &consumeMessage)
-			if err!=nil{
-				return  err
-			}
-			time.Sleep(1 * time.Second)
-			fmt.Println(time.Now().Format("Mon, 02 Jan 2006 15:04:05 "), " Message:",consumeMessage)
-			return nil
+		var consumeMessage PersonV1
+		var err =json.Unmarshal(message.Payload, &consumeMessage)
+		if err!=nil{
+			return  err
 		}
-		messageBus.Consume("In.Person",  PersonV1{}, onConsumed)
-	}()
+		time.Sleep(1 * time.Second)
+		fmt.Println(time.Now().Format("Mon, 02 Jan 2006 15:04:05 "), " Message:",consumeMessage)
+		return nil
+	}
+	messageBus.Listen("In.Person",  PersonV1{}, onConsumed)
 
-	go func(){
-		for i := 0; i < 100; i++ {
-			messageBus.Publish(PersonV1{Name: "Adam", Surname: "Smith", City: City{Name: "London"}, Count: i},
-			rabbit.WithCorrelationId("e1a14bd2-c1dd-49a7-aa80-1bd5f4d0c47e"))
-			fmt.Println("Message was sent successfully : Count => ", i)
-		}
-	}()
 
-	var userInput string
-	fmt.Scanln(&userInput)
 }
 

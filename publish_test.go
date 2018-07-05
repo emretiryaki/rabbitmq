@@ -3,7 +3,6 @@ package rabbitmq
 import (
 	"testing"
 	"encoding/json"
-	"fmt"
 )
 
 

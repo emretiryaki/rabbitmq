@@ -36,7 +36,7 @@ func TestWithBasicPubSubNoPanicOrError(t *testing.T) {
 
 
 	messageBus.Publish(PersonV1{Name:"Emre",Surname:"Tiryaki",City:City{Name:"Istanbul"}})
-	messageBus.Consume("BasicPubSubNoPanicOrError", consumeMessage, onConsumed)
+	messageBus.Listen("BasicPubSubNoPanicOrError", consumeMessage, onConsumed)
 
 
 

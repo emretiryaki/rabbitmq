@@ -5,7 +5,6 @@ import (
 	"time"
 	"errors"
 	"encoding/json"
-
 )
 
 var (
@@ -31,7 +30,6 @@ func convertPublishMessage(message publishMessage)(amqp.Publishing){
 		message.CorrelationId = getGuid()
 	}
 	var body,_= getBytes(message.Payload)
-
 	return amqp.Publishing{
 		MessageId:getGuid(),
 		Body:body,
@@ -43,6 +41,21 @@ func convertPublishMessage(message publishMessage)(amqp.Publishing){
 		ContentType:"application/json",
 		}
 }
+
+func convertErrorPublishMessage(correlationId string, payload []byte)(amqp.Publishing){
+
+	return amqp.Publishing{
+		MessageId:getGuid(),
+		Body:payload,
+		Headers: amqp.Table{},
+		CorrelationId:correlationId,
+		Timestamp:time.Now(),
+		DeliveryMode:deliveryMode,
+		ContentEncoding:"UTF-8",
+		ContentType:"application/json",
+	}
+}
+
 
 func getBytes(key interface{}) ([]byte, error) {
 	return  json.Marshal(key)

@@ -27,7 +27,7 @@ type (
 
 func main(){
 
-	var messageBus=rabbit.CreateUsingRabbitMq("amqp://guest:guest@localhost:5672/",rabbit.ConcurrentCount(4))
+	var messageBus=rabbit.CreateUsingRabbitMq("amqp://guest:guest@localhost:5672/")
 
 	go func(){
 		onConsumed := func(message rabbit.Message) error {
@@ -40,7 +40,7 @@ func main(){
 			return nil
 		}
 
-		messageBus.Consume("In.CustomerV1", CustomerV1{}, onConsumed)
+		messageBus.Listen("In.CustomerV1", CustomerV1{}, onConsumed)
 	}()
 
 	for i := 0; i < 100; i++ {
@@ -64,7 +64,7 @@ func main(){
 			return nil
 		}
 
-		messageBus.Consume("In.CustomerV2", CustomerV2{}, onConsumed)
+		messageBus.Listen("In.CustomerV2", CustomerV2{}, onConsumed)
 	}()
 
 	for i := 0; i < 100; i++ {

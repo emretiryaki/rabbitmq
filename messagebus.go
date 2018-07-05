@@ -3,11 +3,8 @@ package rabbitmq
 import (
 	"sync"
 	"github.com/streadway/amqp"
-
-
-	"fmt"
-	"errors"
 	"time"
+	"fmt"
 )
 
 var (
@@ -15,8 +12,6 @@ var (
 	messageBusInstance *messageBus
 	ErrorPrefix=".Error"
 	retryCount=0
-	concurrentCount=1
-
 )
 
 type (
@@ -26,18 +21,17 @@ type (
 
 	MessageBus interface{
 		Publish(payload interface{},builders ...BuilderPublishFunc) error
-		Consume(queueName string,  consumeMessage interface{},fn OnConsumeFunc)
+		Listen(queueName string,  consumeMessage interface{},fn OnConsumeFunc)
 	}
 
 	messageBus struct {
 	queues          map[string]string
 	exchanges       map[string]string
-	consumer        Consume
 	concurrentCount int
 	retryCount      int
-	sync.Mutex
 	connection      *amqp.Connection
 	channel         *amqp.Channel
+	uri             string
 }
 
 	Message struct {
@@ -52,13 +46,6 @@ type (
 func  RetryCount(retryCount int)  HandleFunc{
 	return func(m *messageBus) error{
 		m.retryCount=retryCount
-		return  nil
-	}
-}
-
-func  ConcurrentCount(concurrentCount int)  HandleFunc{
-	return func(m *messageBus) error{
-		m.concurrentCount=concurrentCount
 		return  nil
 	}
 }
@@ -87,8 +74,9 @@ func (m messageBus) Publish(payload interface{},builders ...BuilderPublishFunc) 
 	}
 }
 
-func (mb messageBus) Consume(queueName string,consumeMessage interface{},fn OnConsumeFunc )  {
+func (mb* messageBus) Listen(queueName string,consumeMessage interface{},fn OnConsumeFunc )  {
 
+	mb.createChannel()
 	var exchangeName = getExchangeName(consumeMessage)
 	destinationExchange:=queueName
 
@@ -100,50 +88,63 @@ func (mb messageBus) Consume(queueName string,consumeMessage interface{},fn OnCo
 	if !isExistExchange {
 		mb.createExchange(exchangeName,"")
 	}
+
 	mb.createQueue(destinationExchange,queueName,"")
-	mb.createChannel()
 	mb.channel.ExchangeBind(destinationExchange,"",exchangeName,true,nil)
 	mb.createQueue(errorQueue,errorExchange,"")
-	mb.channel.Close()
 
-	consumerMessage,_:=mb.consumer.Consume(ConsumeSetting{arg:nil,isNoWait:false,isNoLocal:false,isExclusive:false,queueName:queueName,autoAck:false})
+	defer mb.channel.Close()
+	defer mb.connection.Close()
 
+	for {
+				var conn, err= createConn(mb.uri)
+				if err!=nil {
+					continue
+				}
+				mb.connection =conn
+				mb.createChannel()
 
-	forever := make(chan bool)
-	for x := 0; x < mb.concurrentCount; x++ {
-		go func() {
-			defer close(consumerMessage)
-			for m := range consumerMessage {
-				Do(func(attempt int) (retry bool, err error) {
+				delivery, _ := mb.channel.Consume(queueName,
+					"",
+					false,
+					false,
+					false,
+					false,
+					nil)
 
-				 	retry = attempt< mb.retryCount
+				for m := range delivery {
 
-					 defer func() {
-						if r := recover(); r != nil {
-							err = errors.New(fmt.Sprintf("panic: %v", r))
-							if  attempt== mb.retryCount {
-								var  messageError= publishMessage{Exchange:errorExchange,Payload:m.Body}
-								mb.channel.Publish(errorExchange,"",false,false,convertPublishMessage(messageError))
-								m.Ack(false)
+					Do(func(attempt int) (retry bool, err error) {
+						retry = attempt < mb.retryCount
+
+						defer func() {
+
+							if r := recover();  r != nil {
+								fmt.Println("recovered:", r)
+								if !retry {
+									mb.channel.Publish(errorExchange, "", false, false, convertErrorPublishMessage(m.CorrelationId, m.Body))
+									m.Ack(false)
+								}
+								return
 							}
+						}()
+						err =fn(Message{CorrelationId: m.CorrelationId, Payload: m.Body, MessageId: m.MessageId, Timestamp: m.Timestamp})
+						if  err!= nil  {
+							panic(err)
 						}
-					}()
-					err=fn(Message{CorrelationId:m.CorrelationId,Payload:m.Body ,MessageId:m.MessageId,Timestamp:m.Timestamp})
-					if err!=nil{
-						panic(err)
-					}
-					m.Ack(false)
-					return
-				})
-
-			}
-
-		}()
-	}
-
-	<-forever
-
+						err =m.Ack(false)
+						if  err!= nil  {
+							panic(err)
+						}
+						return
+					})
+				}
+		}
 }
+
+
+
+
 
 
 func (mb* messageBus) createQueue(destinationExchange string, queueName string, routingKey string) {
@@ -164,8 +165,6 @@ func  (mb *messageBus) createExchange(exchange string,routingKey  string) error{
 }
 
 
-
-
 func exchangeType (routingKey string) string{
 	var exchangeType="fanout"
 	if routingKey!=""{
@@ -175,9 +174,9 @@ func exchangeType (routingKey string) string{
 }
 
 
-func createConn(dsn string) (*amqp.Connection) {
-	conn, _ := amqp.Dial(dsn)
-	return conn
+func createConn(dsn string) (*amqp.Connection, error) {
+	conn, error := amqp.Dial(dsn)
+	return conn,error
 }
 
 func (m* messageBus	) createChannel() (error) {
@@ -186,17 +185,18 @@ func (m* messageBus	) createChannel() (error) {
 	return  err
 }
 
+
 func CreateUsingRabbitMq(uri string,handlefunceList ...HandleFunc) (MessageBus) {
 
 	oncebus.Do(func() {
-		var conn =createConn(uri)
+		var conn,_ =createConn(uri)
 
 		messageBusInstance = &messageBus{
-			concurrentCount:concurrentCount,
 			retryCount:retryCount,
 			queues:make(map[string]string),
 			exchanges:make(map[string]string),
 			connection:conn,
+			uri:uri,
 		}
 		for _, handler:= range handlefunceList {
 			if  err:= handler(messageBusInstance);err!=nil{
@@ -207,6 +207,4 @@ func CreateUsingRabbitMq(uri string,handlefunceList ...HandleFunc) (MessageBus) 
 	})
 	return  messageBusInstance
 }
-
-
 

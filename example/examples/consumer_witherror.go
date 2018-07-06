@@ -22,6 +22,7 @@ type (
 )
 
 func main() {
+
 	var messageBus = rabbit.CreateUsingRabbitMq("amqp://guest:guest@localhost:5672/")
 
 	go func() {
@@ -51,9 +52,6 @@ func main() {
 			if err != nil {
 				fmt.Println(time.Now().Format("Mon, 02 Jan 2006 15:04:05 "), " UnSupported Message Type : ")
 				return err
-			}
-			if consumeMessage.Count == 1 {
-				panic("runtime error")
 			}
 			return nil
 		}

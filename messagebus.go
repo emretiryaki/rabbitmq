@@ -122,6 +122,9 @@ func (mb *messageBus) Listen(queueName string, consumeMessage interface{}, fn On
 							mb.channel.Publish(errorExchange, "", false, false, convertErrorPublishMessage(m.CorrelationId, m.Body))
 							m.Ack(false)
 						}
+						if err == nil{
+							m.Nack(false,true) //Requeue When An Panic Occured In Consumer
+						}
 						return
 					}
 				}()

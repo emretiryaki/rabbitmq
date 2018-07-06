@@ -1,75 +1,69 @@
 package rabbitmq
 
 import (
-	 "github.com/streadway/amqp"
-	"time"
-	"errors"
 	"encoding/json"
+	"errors"
+	"github.com/streadway/amqp"
+	"time"
 )
 
 var (
-	deliveryMode uint8=2
+	deliveryMode uint8 = 2
 )
 
-type(
-
+type (
 	BuilderPublishFunc func(*publishMessage) error
 
 	publishMessage struct {
 		CorrelationId string
-		Exchange string
-		Payload interface{}
-
+		Exchange      string
+		Payload       interface{}
 	}
-
 )
 
-func convertPublishMessage(message publishMessage)(amqp.Publishing){
+func convertPublishMessage(message publishMessage) amqp.Publishing {
 
-	if message.CorrelationId== ""{
+	if message.CorrelationId == "" {
 		message.CorrelationId = getGuid()
 	}
-	var body,_= getBytes(message.Payload)
+	var body, _ = getBytes(message.Payload)
 	return amqp.Publishing{
-		MessageId:getGuid(),
-		Body:body,
-		Headers: amqp.Table{},
-		CorrelationId:message.CorrelationId,
-		Timestamp:time.Now(),
-		DeliveryMode:deliveryMode,
-		ContentEncoding:"UTF-8",
-		ContentType:"application/json",
-		}
-}
-
-func convertErrorPublishMessage(correlationId string, payload []byte)(amqp.Publishing){
-
-	return amqp.Publishing{
-		MessageId:getGuid(),
-		Body:payload,
-		Headers: amqp.Table{},
-		CorrelationId:correlationId,
-		Timestamp:time.Now(),
-		DeliveryMode:deliveryMode,
-		ContentEncoding:"UTF-8",
-		ContentType:"application/json",
+		MessageId:       getGuid(),
+		Body:            body,
+		Headers:         amqp.Table{},
+		CorrelationId:   message.CorrelationId,
+		Timestamp:       time.Now(),
+		DeliveryMode:    deliveryMode,
+		ContentEncoding: "UTF-8",
+		ContentType:     "application/json",
 	}
 }
 
+func convertErrorPublishMessage(correlationId string, payload []byte) amqp.Publishing {
+
+	return amqp.Publishing{
+		MessageId:       getGuid(),
+		Body:            payload,
+		Headers:         amqp.Table{},
+		CorrelationId:   correlationId,
+		Timestamp:       time.Now(),
+		DeliveryMode:    deliveryMode,
+		ContentEncoding: "UTF-8",
+		ContentType:     "application/json",
+	}
+}
 
 func getBytes(key interface{}) ([]byte, error) {
-	return  json.Marshal(key)
+	return json.Marshal(key)
 }
 
-
-func WithCorrelationId(correlationId string)  BuilderPublishFunc{
-	return func(m *publishMessage)  error {
-		if isGuid(correlationId){
+func WithCorrelationId(correlationId string) BuilderPublishFunc {
+	return func(m *publishMessage) error {
+		if isGuid(correlationId) {
 			m.CorrelationId = correlationId
 			return nil
-		}else {
-		 	return 	errors.New("invalid UUID format")
+		} else {
+			return errors.New("invalid UUID format")
 		}
 	}
 }
-

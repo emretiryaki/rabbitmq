@@ -5,13 +5,13 @@ import (
 	"reflect"
 )
 
-func getGuid() string{
+func getGuid() string {
 	return uuid.New().String()
 }
 
-func isGuid(paramater string) bool{
-	_,err:= uuid.Parse(paramater)
-	if err!=nil{
+func isGuid(paramater string) bool {
+	_, err := uuid.Parse(paramater)
+	if err != nil {
 		return false
 	}
 	return true

@@ -7,18 +7,18 @@ import (
 )
 
 func TestIsGuid(t *testing.T) {
-	if isGuid("test")  {
-		t.Logf("Test Success : Actual [%d]\tExptected [%d]\n", false,false)
+	if isGuid("test") {
+		t.Logf("Test Success : Actual [%d]\tExptected [%d]\n", false, false)
 	}
-	if isGuid(uuid.New().String())  {
-		t.Logf("Test Success : Actual [%d]\tExptected [%d]\n", true,true)
+	if isGuid(uuid.New().String()) {
+		t.Logf("Test Success : Actual [%d]\tExptected [%d]\n", true, true)
 	}
 }
 
 func TestGetGuid(t *testing.T) {
-	var guid =getGuid()
-	_,err:= uuid.Parse(guid)
-	if err!=nil  {
-		t.Errorf("Test Failed : Actual [%d]\tExptected [%d]\n", guid,err.Error())
+	var guid = getGuid()
+	_, err := uuid.Parse(guid)
+	if err != nil {
+		t.Errorf("Test Failed : Actual [%d]\tExptected [%d]\n", guid, err.Error())
 	}
 }

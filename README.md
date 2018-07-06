@@ -3,14 +3,15 @@ RabbitMq Wrapper is the a client API for RabbitMQ.
 
 * A  wrapper over [amqp](https://github.com/streadway/amqp) exchanges and queues.
 * In memory retries for consuming messages when an error occured
-* Retry policy
-* Some extra features while publishing message 
+* CorrelationId and MessageId structure
+* Retry policy (will be added)
+* Some extra features while publishing message  (will be added) 
 
 To connect to a RabbitMQ broker...
 
     	var messageBus=rabbit.CreateUsingRabbitMq("amqp://guest:guest@localhost:5672/")
 
-To connect to a RabbitMQ broker with concurrency and retry policy 
+To connect to a RabbitMQ broker with retry policy 
  * Consumer retries two times if an error occured
 
       	var messageBus=rabbit.CreateUsingRabbitMq("amqp://guest:guest@localhost:5672/",

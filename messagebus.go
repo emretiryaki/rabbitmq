@@ -96,6 +96,9 @@ func (mb *messageBus) Listen(queueName string, consumeMessage interface{}, fn On
 	for {
 		var conn, err = createConn(mb.uri)
 		if err != nil {
+			time.Sleep(time.Second*5)
+			mb.connection.Close()
+			mb.channel.Close()
 			continue
 		}
 		mb.connection = conn

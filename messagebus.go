@@ -31,6 +31,7 @@ type (
 		connection      *amqp.Connection
 		channel         *amqp.Channel
 		uri             string
+		prefetchCount  int
 	}
 
 	Message struct {
@@ -41,12 +42,20 @@ type (
 	}
 )
 
+func PrefetchCount(prefetchCount int) HandleFunc {
+	return func(m *messageBus) error {
+		m.prefetchCount = prefetchCount
+		return nil
+	}
+}
+
 func RetryCount(retryCount int) HandleFunc {
 	return func(m *messageBus) error {
 		m.retryCount = retryCount
 		return nil
 	}
 }
+
 
 func (m messageBus) Publish(payload interface{}, builders ...BuilderPublishFunc) error {
 
@@ -75,9 +84,8 @@ func (mb *messageBus) Listen(queueName string, consumeMessage interface{}, fn On
 
 	mb.createChannel()
 	var exchangeName = getExchangeName(consumeMessage)
-	destinationExchange := queueName
 
-	var errorQueue = destinationExchange + ErrorPrefix
+	var errorQueue = queueName + ErrorPrefix
 	var errorExchange = queueName + ErrorPrefix
 
 	_, isExistExchange := mb.exchanges[exchangeName]
@@ -86,8 +94,7 @@ func (mb *messageBus) Listen(queueName string, consumeMessage interface{}, fn On
 		mb.createExchange(exchangeName, "")
 	}
 
-	mb.createQueue(destinationExchange, queueName, "")
-	mb.channel.ExchangeBind(destinationExchange, "", exchangeName, true, nil)
+	mb.createQueue(exchangeName, queueName, "")
 	mb.createQueue(errorQueue, errorExchange, "")
 
 	defer mb.channel.Close()
@@ -174,7 +181,15 @@ func createConn(dsn string) (*amqp.Connection, error) {
 }
 
 func (m *messageBus) createChannel() error {
+
 	var channel, err = m.connection.Channel()
+
+	err = channel.Qos(
+		m.prefetchCount,     // prefetch count
+		0,     // prefetch size
+		false, // global
+	)
+
 	m.channel = channel
 	return err
 }
@@ -190,6 +205,7 @@ func CreateUsingRabbitMq(uri string, handlefunceList ...HandleFunc) MessageBus {
 			exchanges:  make(map[string]string),
 			connection: conn,
 			uri:        uri,
+			prefetchCount:1,
 		}
 		for _, handler := range handlefunceList {
 			if err := handler(messageBusInstance); err != nil {

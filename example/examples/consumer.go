@@ -23,7 +23,7 @@ type (
 
 func main() {
 
-	var messageBus = rabbit.CreateUsingRabbitMq("amqp://guest:guest@localhost:5672/", rabbit.RetryCount(2))
+	var messageBus = rabbit.CreateUsingRabbitMq("amqp://guest:guest@localhost:5672/", rabbit.RetryCount(2),rabbit.PrefetchCount(2))
 
 	for i := 0; i < 100; i++ {
 		messageBus.Publish(PersonV1{Name: "Adam", Surname: "Smith",Count:i}, rabbit.WithCorrelationId(uuid.New().String()))

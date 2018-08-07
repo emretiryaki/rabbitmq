@@ -5,10 +5,14 @@ import (
 	"errors"
 	"github.com/streadway/amqp"
 	"time"
+
+	"strconv"
 )
 
 var (
 	deliveryMode uint8 = 2
+	HEADER_ERROR ="Error"
+	HEADER_RETRY_COUNT="RetryCount"
 )
 
 type (
@@ -21,7 +25,13 @@ type (
 	}
 )
 
-func convertPublishMessage(message publishMessage) amqp.Publishing {
+func convertToPublishMessage(payload interface{} , builders ...BuilderPublishFunc) amqp.Publishing {
+
+	var message = publishMessage {Payload: payload }
+
+	for _, handler := range builders {
+		handler(&message)
+	}
 
 	if message.CorrelationId == "" {
 		message.CorrelationId = getGuid()
@@ -39,12 +49,18 @@ func convertPublishMessage(message publishMessage) amqp.Publishing {
 	}
 }
 
-func convertErrorPublishMessage(correlationId string, payload []byte) amqp.Publishing {
+
+
+func convertErrorPublishMessage(correlationId string, payload []byte, retryCount int, err error) amqp.Publishing {
+
+	headers := make(map[string]interface{})
+	headers[HEADER_RETRY_COUNT] = strconv.Itoa(retryCount)
+	headers[HEADER_ERROR] = err.Error()
 
 	return amqp.Publishing{
 		MessageId:       getGuid(),
 		Body:            payload,
-		Headers:         amqp.Table{},
+		Headers:         headers,
 		CorrelationId:   correlationId,
 		Timestamp:       time.Now(),
 		DeliveryMode:    deliveryMode,
@@ -58,6 +74,7 @@ func getBytes(key interface{}) ([]byte, error) {
 }
 
 func WithCorrelationId(correlationId string) BuilderPublishFunc {
+
 	return func(m *publishMessage) error {
 		if isGuid(correlationId) {
 			m.CorrelationId = correlationId

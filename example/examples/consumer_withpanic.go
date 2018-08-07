@@ -20,11 +20,11 @@ type (
 
 func main() {
 
-	var messageBus = rabbit.CreateUsingRabbitMq("amqp://guest:guest@localhost:5672/", rabbit.RetryCount(2))
+	var messageBus = rabbit.CreateUsingRabbitMq("amqp://guest:guest@localhost:5672/", rabbit.RetryCount(2,time.Duration(0)))
 
 	for i := 0; i < 1; i++ {
 		messageBus.Publish(PersonV3{Name: "Adam", Surname: "Smith",Count:i}, rabbit.WithCorrelationId(uuid.New().String()))
-		fmt.Println(" Message was sent successfully by FirstFunc")
+		fmt.Println(" Message was sent successfully by ")
 	}
 
 	onConsumed := func(message rabbit.Message) error {
@@ -40,6 +40,6 @@ func main() {
 		panic("panic")
 		return nil
 	}
-	messageBus.Listen("In.Person3", PersonV3{}, onConsumed)
+	messageBus.Consume("In.Person3", PersonV3{}, onConsumed)
 
 }

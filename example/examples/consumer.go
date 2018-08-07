@@ -1,10 +1,11 @@
 package main
 
 import (
-	"encoding/json"
+
 	"fmt"
-	rabbit "github.com/emretiryaki/rabbitmq"
 	"time"
+	"encoding/json"
+	rabbit "github.com/emretiryaki/rabbitmq"
 	"github.com/google/uuid"
 )
 
@@ -23,24 +24,36 @@ type (
 
 func main() {
 
-	var messageBus = rabbit.CreateUsingRabbitMq("amqp://guest:guest@localhost:5672/", rabbit.RetryCount(2),rabbit.PrefetchCount(2))
+	var messageBus = rabbit.CreateUsingRabbitMq("amqp://guest:guest@localhost:5672/",
+		rabbit.RetryCount(1,time.Duration(1)),
+		rabbit.PrefetchCount(2))
 
-	for i := 0; i < 100; i++ {
-		messageBus.Publish(PersonV1{Name: "Adam", Surname: "Smith",Count:i}, rabbit.WithCorrelationId(uuid.New().String()))
-		fmt.Println(" Message was sent successfully by FirstFunc")
+	for i := 0; i < 1000; i++ {
+
+		var publishMessage= PersonV1{Name: "Adam", Surname: "Smith", Count: i}
+		messageBus.Publish(publishMessage, rabbit.WithCorrelationId(uuid.New().String()))
+		fmt.Println(" Message was sent successfully :", publishMessage)
+
 	}
 
 	onConsumed := func(message rabbit.Message) error {
 
 		var consumeMessage PersonV1
-		var err = json.Unmarshal(message.Payload, &consumeMessage)
+		var err= json.Unmarshal(message.Payload, &consumeMessage)
 		if err != nil {
 			return err
 		}
-		time.Sleep(1 * time.Second)
+		for i := 0; i < 100; i++ {
+
+			var publishMessage= PersonV1{Name: "Adam", Surname: "Smith", Count: i}
+			messageBus.Publish(publishMessage, rabbit.WithCorrelationId(uuid.New().String()))
+			fmt.Println(" Message was sent successfully :", publishMessage)
+
+		}
+		//time.Sleep(1 * time.Second)
 		fmt.Println(time.Now().Format("Mon, 02 Jan 2006 15:04:05 "), " Message:", consumeMessage)
 		return nil
 	}
-	messageBus.Listen("In.Person", PersonV1{}, onConsumed)
+	messageBus.Consume("In.Person", PersonV1{}, onConsumed)
 
 }

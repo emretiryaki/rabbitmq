@@ -24,16 +24,18 @@ func main() {
 
 	go func() {
 		for i := 0; i < 100; i++ {
-			messageBus.Publish(PersonV2{Name: "Adam", Surname: "Smith"}, rabbit.WithCorrelationId(uuid.New().String()))
-			fmt.Println(" Message was sent successfully by FirstFunc")
+			var publishMessage = PersonV2{Name: "Adam", Surname: "Smith"}
+			messageBus.Publish(publishMessage, rabbit.WithCorrelationId(uuid.New().String()))
+			fmt.Println(" Message was sent successfully :",publishMessage )
 		}
 		wg.Done()
 	}()
 
 	for i := 0; i < 100; i++ {
 		go func() {
-			messageBus.Publish(PersonV2{Name: "Adam", Surname: "Smith"}, rabbit.WithCorrelationId(uuid.New().String()))
-			fmt.Println("Message was sent successfully by SecondFunc")
+			var publishMessage = PersonV2{Name: "Adam", Surname: "Smith"}
+			messageBus.Publish(publishMessage, rabbit.WithCorrelationId(uuid.New().String()))
+			fmt.Println(" Message was sent successfully :",publishMessage )
 			wg.Done()
 		}()
 	}
@@ -49,5 +51,5 @@ func main() {
 		fmt.Println(time.Now().Format("Mon, 02 Jan 2006 15:04:05 "), " Message:", consumeMessage)
 		return nil
 	}
-	messageBus.Listen("In.Personv2", PersonV2{}, onConsumed)
+	messageBus.Consume("In.Personv2", PersonV2{}, onConsumed)
 }

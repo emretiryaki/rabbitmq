@@ -2,9 +2,9 @@ package rabbitmq
 
 import (
 	"time"
-	"fmt"
-	"strings"
 	"github.com/streadway/amqp"
+	"sync"
+	"fmt"
 )
 
 var (
@@ -21,16 +21,18 @@ type (
 
 	MessageBus interface {
 		Publish (payload interface{}, builders ...BuilderPublishFunc) error
-		Consume (queueName string, consumeMessage interface{}, fn OnConsumeFunc)
+		Consume (queueName string, exchangeName string, fn OnConsumeFunc)
 	}
 
 	messageBus struct {
 		queues          map[string]string
 		exchanges       map[string]string
 		parameters      MessageBrokerParameter
-		consumeIsFailOnce bool
+		publisherClientIsFail bool
 		messageBroker    MessageBroker
 		brokerClientConsumer 	*BrokerChannel
+		brokerClientPublisher   *BrokerChannel
+
 	}
 
 	Message struct {
@@ -62,64 +64,44 @@ func RetryCount(retryCount int,retryInterval time.Duration) HandleFunc {
 func (mb* messageBus) Publish(payload interface{}, builders ...BuilderPublishFunc) error {
 
 	var err error
-	var brokerClient *BrokerChannel
 	var exchange= getExchangeName(payload)
+	var m sync.Mutex
+	m.Lock()
 	_, isExist := mb.exchanges[exchange]
-
-	brokerClient,err = mb.messageBroker.CreateChannel()
-
-	if err != nil {
-
-		if err = mb.messageBroker.CreateConnection(mb.parameters) ; err != nil {
-			return err
-		}
-
+	m.Unlock()
+	if !mb.publisherClientIsFail{
+		mb.messageBroker.CreateConnection(mb.parameters)
+		mb.publisherClientIsFail =<- mb.messageBroker.SignalConnection()
 	}
 
-	defer brokerClient.channel.Close()
+	mb.brokerClientPublisher,err = mb.messageBroker.CreateChannel()
 
-	if isExist {
-		return brokerClient.channel.Publish(exchange, "", false, false,  convertToPublishMessage(payload))
+	if err!=nil{
+		return err
+	}
 
-		} else {
+	defer mb.brokerClientPublisher.channel.Close()
 
-		createExchange(brokerClient.channel,exchange, "")
+	if !isExist {
+		mb.createExchangeForPublisher(exchange, "")
 		mb.exchanges[exchange] = exchange
-		return brokerClient.channel.Publish(exchange, "", false, false,  convertToPublishMessage(payload))
 	}
+	return mb.brokerClientPublisher.channel.Publish(exchange, "", false, false,  convertToPublishMessage(payload))
 
 }
 
-func (mb *messageBus) Consume(queueName string, consumeMessage interface{}, fn OnConsumeFunc) {
+func (mb *messageBus) Consume(queueName string, exchangeName string, fn OnConsumeFunc) {
 
-	var broker *BrokerChannel
 	var err error
-	var exchangeName= getExchangeName(consumeMessage)
 
-	var errorQueue= queueName + ERROR_PREFIX
-	var errorExchange= queueName + ERROR_PREFIX
+	var errorQueue = queueName + ERROR_PREFIX
+	var errorExchange = queueName + ERROR_PREFIX
 
 	_, isExistExchange := mb.exchanges[exchangeName]
 
-	if broker, err = mb.messageBroker.CreateChannel(); err != nil {
-		panic(err)
-
-	} else {
-		mb.brokerClientConsumer = broker
-
-	}
-
 	if !isExistExchange {
-		createExchange(broker.channel, exchangeName, "")
 		mb.exchanges[exchangeName] = exchangeName
 	}
-
-	createQueue(broker.channel,exchangeName, queueName, "")
-	createQueue(broker.channel,errorQueue, errorExchange, "")
-
-	defer mb.brokerClientConsumer.channel.Close()
-
-	mb.brokerClientConsumer.channel.Qos(mb.parameters.PrefetchCount, 0, false)
 
 	for {
 
@@ -129,14 +111,19 @@ func (mb *messageBus) Consume(queueName string, consumeMessage interface{}, fn O
 
 			if !isConnected {
 
-				if err = mb.messageBroker.CreateConnection(mb.parameters); err != nil {
-					continue
+				mb.messageBroker.CreateConnection(mb.parameters)
+
+			}
+			if isConnected {
+
+				if mb.brokerClientConsumer, err = mb.messageBroker.CreateChannel(); err != nil {
+					panic(err)
 				}
-				mb.brokerClientConsumer, _ = mb.messageBroker.CreateChannel()
+				mb.createExchange(exchangeName, "")
+				mb.createQueue(exchangeName, queueName, "")
+				mb.createQueue( errorQueue, errorExchange, "")
 
-				continue
-
-			} else if isConnected {
+				mb.brokerClientConsumer.channel.Qos(mb.parameters.PrefetchCount, 0, false)
 
 				delivery, _ := mb.listenToQueue(queueName)
 
@@ -153,23 +140,15 @@ func (mb *messageBus) Consume(queueName string, consumeMessage interface{}, fn O
 								defer func() {
 
 									if r := recover(); r != nil {
-										fmt.Println("recovered:", r)
-										if err!=nil && strings.Index(err.Error(), "504") > -1 {
-											mb.messageBroker.SignalConnectionStatus(false)
-											return
-										}
 										if !retry {
-
-											brokerError := broker.channel.Publish(errorExchange, "", false, false, convertErrorPublishMessage(m.CorrelationId, m.Body, mb.parameters.RetryCount, err))
-
-											if brokerError == nil {
-												m.Ack(false)
-											}else {
-												m.Nack(false, true) //Requeue When An Panic Occured In Consumer
-											}
+											mb.brokerClientConsumer.channel.Publish(errorExchange, "", false, false, convertErrorPublishMessage(m.CorrelationId, m.Body, mb.parameters.RetryCount, err))
+											m.Ack(false)
 										}
-										if err == nil {
-											m.Nack(false, true) //Requeue When An Panic Occured In Consumer
+										if  err == nil {
+											err = fmt.Errorf("panic occured In Consumer  %q (message %d)",m.CorrelationId, m.Body )
+											mb.brokerClientConsumer.channel.Publish(errorExchange, "", false, false, convertErrorPublishMessage(m.CorrelationId, m.Body, mb.parameters.RetryCount, err))
+											m.Ack(false)
+											retry =false
 										}
 										return
 									}
@@ -178,23 +157,19 @@ func (mb *messageBus) Consume(queueName string, consumeMessage interface{}, fn O
 								if err != nil {
 									panic(err)
 								}
-								err = m.Ack(false)
-								if err != nil {
-									panic(err)
-								}
+								m.Ack(false)
 								return
 							})
 
 						}
+
 					}()
 				}
-
 			}
-
 		}
 	}
-
 }
+
 
 
 func (mb* messageBus) listenToQueue( queueName string)(<-chan amqp.Delivery,error){
@@ -214,15 +189,22 @@ func (mb* messageBus) listenToQueue( queueName string)(<-chan amqp.Delivery,erro
 	return msg, nil
 }
 
-func  createQueue(channel *amqp.Channel,destinationExchange string, queueName string, routingKey string) {
+func(mb *messageBus)  createQueue(destinationExchange string, queueName string, routingKey string) {
 
-	channel.ExchangeDeclare(destinationExchange, "fanout", true, false, false, false, nil)
-	q, _ :=  channel.QueueDeclare(queueName, true, false, false, false, nil)
-	channel.QueueBind(q.Name, routingKey, destinationExchange, false, nil)
+	mb.brokerClientConsumer.channel.ExchangeDeclare(destinationExchange, "fanout", true, false, false, false, nil)
+	q, _ :=  mb.brokerClientConsumer.channel.QueueDeclare(queueName, true, false, false, false, nil)
+	mb.brokerClientConsumer.channel.QueueBind(q.Name, routingKey, destinationExchange, false, nil)
 }
 
-func createExchange(channel *amqp.Channel, exchange string, routingKey string) error {
-	var err = channel.ExchangeDeclare(exchange, exchangeType(routingKey), true, false, false, false, nil)
+func(mb *messageBus) createExchange( exchange string, routingKey string) error {
+	var err = mb.brokerClientConsumer.channel.ExchangeDeclare(exchange, exchangeType(routingKey), true, false, false, false, nil)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+func(mb *messageBus) createExchangeForPublisher( exchange string, routingKey string) error {
+	var err = mb.brokerClientPublisher.channel.ExchangeDeclare(exchange, exchangeType(routingKey), true, false, false, false, nil)
 	if err != nil {
 		return err
 	}
@@ -258,8 +240,6 @@ func CreateUsingRabbitMq(uri string, handlefuncList ...HandleFunc) MessageBus {
 			panic(err)
 		}
 	}
-
-	messageBusInstance.messageBroker.CreateConnection(messageBusInstance.parameters)
 
 	return messageBusInstance
 }

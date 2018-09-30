@@ -40,6 +40,6 @@ func main() {
 		panic("panic")
 		return nil
 	}
-	messageBus.Consume("In.Person3", PersonV3{}, onConsumed)
+	messageBus.Consume("In.Person3", "PersonV3", onConsumed)
 
 }

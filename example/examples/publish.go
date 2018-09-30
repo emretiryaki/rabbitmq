@@ -1,12 +1,12 @@
 package main
 
 import (
-	"encoding/json"
+
 	"fmt"
 	rabbit "github.com/emretiryaki/rabbitmq"
 	"github.com/google/uuid"
 	"sync"
-	"time"
+
 )
 
 type (
@@ -41,15 +41,5 @@ func main() {
 	}
 	wg.Wait()
 
-	onConsumed := func(message rabbit.Message) error {
-		var consumeMessage PersonV2
-		var err = json.Unmarshal(message.Payload, &consumeMessage)
-		if err != nil {
-			return err
-		}
-		time.Sleep(1 * time.Second)
-		fmt.Println(time.Now().Format("Mon, 02 Jan 2006 15:04:05 "), " Message:", consumeMessage)
-		return nil
-	}
-	messageBus.Consume("In.Personv2", PersonV2{}, onConsumed)
+
 }

@@ -40,28 +40,29 @@ func (b *broker) CreateConnection(parameters MessageBrokerParameter) (error) {
 
 	b.parameters = parameters
 
-	for i := 0; i <= b.parameters.RetryCount; i++ {
+	for {
 
 		if b.connection, err = amqp.Dial(b.parameters.Uri); err != nil {
-
 			time.Sleep(b.parameters.RetryInterval)
-			b.SignalConnectionStatus(false)
 			continue
 		}
+		b.onClose()
+		b.SignalConnectionStatus(true)
 
-		select {
-		case isConnected := <-b.SignalConnection():
-			if !isConnected {
-				b.SignalConnectionStatus(true)
-				return nil
-			} else {
-				return nil
-			}
-		}
+		break
 	}
 
 	return err
 
+}
+func (b *broker) onClose() {
+	go func() {
+		err := <-b.connection.NotifyClose(make(chan *amqp.Error))
+		if err != nil {
+			b.SignalConnectionStatus(false)
+			return
+		}
+	}()
 }
 
 func (b *broker)  CreateChannel()  (*BrokerChannel,error) {

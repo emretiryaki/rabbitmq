@@ -6,6 +6,7 @@ import (
 	"time"
 	"encoding/json"
 	rabbit "github.com/emretiryaki/rabbitmq"
+	server "github.com/emretiryaki/rabbitmq"
 )
 
 type (
@@ -19,13 +20,22 @@ type (
 	City struct {
 		Name string
 	}
+
+	PersonV4 struct {
+		Name    string
+		Surname string
+		City    City
+		Count   int
+	}
+
+
 )
 
 func main() {
 
-	var messageBus = rabbit.CreateUsingRabbitMq("amqp://guest:guest@localhost:5672/",
-		rabbit.RetryCount(2,time.Duration(1)),
-		rabbit.PrefetchCount(4))
+
+
+	var  mes= server.NewRabbitmqServer("amqp://guest:guest@localhost:5672/")
 
 
 
@@ -40,6 +50,22 @@ func main() {
 		fmt.Println(time.Now().Format("Mon, 02 Jan 2006 15:04:05 "), " Message:", consumeMessage)
 		return nil
 	}
-	messageBus.Consume("In.Person", "PersonV1", onConsumed)
+
+	onConsumed2 := func(message rabbit.Message) error {
+
+		var consumeMessage PersonV4
+		var err= json.Unmarshal(message.Payload, &consumeMessage)
+		if err != nil {
+			return err
+		}
+		time.Sleep(1 * time.Second)
+		fmt.Println(time.Now().Format("Mon, 02 Jan 2006 15:04:05 "), " Message:", consumeMessage)
+		return nil
+	}
+	mes.AddConsumer("In.Person3", "PersonV3","", onConsumed2)
+	mes.AddConsumer("In.Person", "PersonV1","", onConsumed)
+
+	mes.RunConsumer()
+
 
 }

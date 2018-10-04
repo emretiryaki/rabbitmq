@@ -33,11 +33,7 @@ type (
 
 func main() {
 
-
-
-	var  mes= server.NewRabbitmqServer("amqp://guest:guest@localhost:5672/")
-
-
+	var  rabbitServer= server.NewRabbitmqServer("amqp://guest:guest@localhost:5672/")
 
 	onConsumed := func(message rabbit.Message) error {
 
@@ -46,7 +42,6 @@ func main() {
 		if err != nil {
 			return err
 		}
-		time.Sleep(1 * time.Second)
 		fmt.Println(time.Now().Format("Mon, 02 Jan 2006 15:04:05 "), " Message:", consumeMessage)
 		return nil
 	}
@@ -58,14 +53,13 @@ func main() {
 		if err != nil {
 			return err
 		}
-		time.Sleep(1 * time.Second)
 		fmt.Println(time.Now().Format("Mon, 02 Jan 2006 15:04:05 "), " Message:", consumeMessage)
 		return nil
 	}
-	mes.AddConsumer("In.Person3", "PersonV3","", onConsumed2)
-	mes.AddConsumer("In.Person", "PersonV1","", onConsumed)
+	rabbitServer.AddConsumer("In.Person3", "PersonV3","", onConsumed2)
+	rabbitServer.AddConsumer("In.Person", "PersonV1","", onConsumed)
 
-	mes.RunConsumer()
+	rabbitServer.RunConsumers()
 
 
 }

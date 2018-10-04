@@ -3,6 +3,8 @@ package rabbitmq
 import (
 	"github.com/google/uuid"
 	"reflect"
+	"fmt"
+	"encoding/json"
 )
 
 func getGuid() string {
@@ -23,4 +25,13 @@ func getExchangeName(message interface{}) string {
 	} else {
 		return t.Name()
 	}
+}
+
+func  logConsole(message string){
+	logMessage,_ :=json.Marshal(Log{Message:message})
+	fmt.Println(string(logMessage))
+}
+
+type Log struct {
+	Message   string
 }

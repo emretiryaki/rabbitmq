@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 )
 
@@ -193,13 +192,6 @@ func (mBrokerServer *MessageBrokerServer) RunConsumers() error {
 	return mBrokerServer.childRoutines.Wait()
 }
 
-func RetryCount1(retryCount int, retryInterval time.Duration) WithFunc {
-	return func(m *MessageBrokerServer) error {
-		m.parameters.RetryCount = retryCount
-		m.parameters.RetryInterval = retryInterval
-		return nil
-	}
-}
 
 func (consumer Consumer) listenToQueue(queueName string) (<-chan amqp.Delivery, error) {
 

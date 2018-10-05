@@ -9,7 +9,15 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
+)
 
+var (
+	ERROR_PREFIX        = ".Error"
+	CONCURRENT_LIMIT= 1
+	RETRY_COUNT=    0
+	PREFECT_COUNT= 1
+	RETRY_INTERVAL= time.Second
 )
 
 func NewRabbitmqServer(uri string, withFunc ...WithFunc) *MessageBrokerServer {
@@ -38,7 +46,12 @@ func NewRabbitmqServer(uri string, withFunc ...WithFunc) *MessageBrokerServer {
 	}
 	return messageBrokerServer
 }
-
+type Message struct {
+	Payload       []byte
+	CorrelationId string
+	MessageId     string
+	Timestamp     time.Time
+}
 type MessageBrokerServer struct {
 	context            context.Context
 	shutdownFn         context.CancelFunc
@@ -62,6 +75,22 @@ type Consumer struct {
 	errorExchangeName string
 	channel           *BrokerChannel
 	startConsumerCn       chan bool
+}
+
+
+func PrefetchCount(prefetchCount int) WithFunc {
+	return func(m *MessageBrokerServer) error {
+		m.parameters.PrefetchCount = prefetchCount
+		return nil
+	}
+}
+
+func RetryCount(retryCount int,retryInterval time.Duration) WithFunc {
+	return func(m *MessageBrokerServer) error {
+		m.parameters.RetryCount = retryCount
+		m.parameters.RetryInterval=retryInterval
+		return nil
+	}
 }
 
 func (mBrokerServer *MessageBrokerServer) Shutdown(reason string) {
@@ -272,4 +301,11 @@ func (consumer *Consumer) createQueue(destinationExchange string, queueName stri
 	consumer.channel.channel.ExchangeDeclare(destinationExchange, "fanout", true, false, false, false, nil)
 	q, _ := consumer.channel.channel.QueueDeclare(queueName, true, false, false, false, nil)
 	consumer.channel.channel.QueueBind(q.Name, routingKey, destinationExchange, false, nil)
+}
+func exchangeType(routingKey string) string {
+	var exchangeType = "fanout"
+	if routingKey != "" {
+		exchangeType = "direct"
+	}
+	return exchangeType
 }

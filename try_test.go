@@ -12,7 +12,6 @@ func TestDoWithPanic(t *testing.T) {
 		panic("something went badly wrong")
 	}
 
-	var value string
 	err := Do(func(attempt int) (retry bool, err error) {
 		retry = attempt < 2 // try 2 times
 		defer func() {
@@ -20,11 +19,11 @@ func TestDoWithPanic(t *testing.T) {
 				err = errors.New(fmt.Sprintf("panic: %v", r))
 			}
 		}()
-		value, err = SomeFunction()
+		_,err = SomeFunction()
 		return
 	})
 	if err == nil {
-		t.Errorf("Test Fail : Actual [%d]\tExptected [%d]\n", nil, "A Panic Occured")
+		t.Errorf("Test Fail : Actual [%v]\tExptected [%v]\n", nil, "A Panic Occured")
 	}
 }
 
@@ -33,14 +32,13 @@ func TestDoWithErrorValue(t *testing.T) {
 		return "", errors.New("an error  occured ")
 	}
 
-	var value string
 	err := Do(func(attempt int) (retry bool, err error) {
 		retry = attempt < 2 // try 2 times
-		value, err = SomeFunction()
+		_,err = SomeFunction()
 		return
 	})
 	if err == nil {
-		t.Errorf("Test Fail : Actual [%d]\tExptected [%d]\n", nil, "Return An Error Value")
+		t.Errorf("Test Fail : Actual [%v]\tExptected [%v]\n", nil, "Return An Error Value")
 	}
 }
 
@@ -50,15 +48,14 @@ func TestDoRetryLimit(t *testing.T) {
 		return "", errors.New("an error  occured ")
 	}
 
-	var value string
 	Do(func(attempt int) (retry bool, err error) {
 		retry = attempt < 2 // try 2 times
 		counter++
-		value, err = SomeFunction()
+		_,err = SomeFunction()
 		return
 	})
 
 	if counter != 3 {
-		t.Errorf("Test Fail : Actual [%d]\tExptected [%d]\n", "Retry Count is 2", counter)
+		t.Errorf("Test Fail : Actual [%v]\tExptected [%d]\n", "Retry Count is 2", counter)
 	}
 }

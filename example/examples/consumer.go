@@ -33,7 +33,7 @@ type (
 
 func main() {
 
-	var  rabbitServer= server.NewRabbitmqServer("amqp://guest:guest@localhost:5672/")
+	var  rabbitServer= server.NewRabbitmqServer("amqp://guest:guest@localhost:5672/",rabbit.RetryCount(2, time.Duration(0)),rabbit.PrefetchCount(3))
 
 	onConsumed := func(message rabbit.Message) error {
 

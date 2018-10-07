@@ -6,7 +6,6 @@ import (
 	"time"
 	"encoding/json"
 	rabbit "github.com/emretiryaki/rabbitmq"
-	"github.com/emretiryaki/merkut/pkg/server"
 )
 
 type (

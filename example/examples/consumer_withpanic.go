@@ -5,7 +5,6 @@ import (
 	"fmt"
 	rabbit "github.com/emretiryaki/rabbitmq"
 	"time"
-	"github.com/google/uuid"
 )
 
 type (
@@ -20,12 +19,9 @@ type (
 
 func main() {
 
-	var messageBus = rabbit.CreateUsingRabbitMq("amqp://guest:guest@localhost:5672/", rabbit.RetryCount(2,time.Duration(0)))
 
-	for i := 0; i < 1; i++ {
-		messageBus.Publish(PersonV3{Name: "Adam", Surname: "Smith",Count:i}, rabbit.WithCorrelationId(uuid.New().String()))
-		fmt.Println(" Message was sent successfully by ")
-	}
+	var  rabbitServer= rabbit.NewRabbitmqServer("amqp://guest:guest@localhost:5672/",rabbit.RetryCount(2,time.Duration(0)))
+
 
 	onConsumed := func(message rabbit.Message) error {
 
@@ -40,6 +36,7 @@ func main() {
 		panic("panic")
 		return nil
 	}
-	messageBus.Consume("In.Person3", "PersonV3", onConsumed)
+	rabbitServer.AddConsumer("In.Person3", "PersonV3","", onConsumed)
+	rabbitServer.RunConsumers()
 
 }

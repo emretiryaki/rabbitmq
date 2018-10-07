@@ -6,7 +6,7 @@ import (
 	"time"
 	"encoding/json"
 	rabbit "github.com/emretiryaki/rabbitmq"
-	server "github.com/emretiryaki/rabbitmq"
+	"github.com/emretiryaki/merkut/pkg/server"
 )
 
 type (
@@ -33,7 +33,7 @@ type (
 
 func main() {
 
-	var  rabbitServer= server.NewRabbitmqServer("amqp://guest:guest@localhost:5672/",rabbit.RetryCount(2, time.Duration(0)),rabbit.PrefetchCount(3))
+	var  rabbitServer= rabbit.NewRabbitmqServer("amqp://guest:guest@localhost:5672/",rabbit.RetryCount(2, time.Duration(0)),rabbit.PrefetchCount(3))
 
 	onConsumed := func(message rabbit.Message) error {
 

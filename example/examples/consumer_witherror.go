@@ -10,8 +10,7 @@ import (
 
 func main() {
 
-	var messageBus= rabbit.CreateUsingRabbitMq("amqp://guest:guest@localhost:5672/")
-
+	var  rabbitServer= rabbit.NewRabbitmqServer("amqp://guest:guest@localhost:5672/",rabbit.PrefetchCount(3))
 
 	onConsumed := func(message rabbit.Message) error {
 		var consumeMessage string
@@ -23,6 +22,8 @@ func main() {
 		return nil
 	}
 
-	messageBus.Consume("In.CustomerV1", "CustomerV1", onConsumed)
+	rabbitServer.AddConsumer("In.CustomerV1", "CustomerV1","", onConsumed)
+	rabbitServer.RunConsumers()
+
 
 }

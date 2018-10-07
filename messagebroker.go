@@ -44,9 +44,11 @@ func (b *broker) CreateConnection(parameters MessageBrokerParameter) (error) {
 
 		if b.connection, err = amqp.Dial(b.parameters.Uri); err != nil {
 			time.Sleep(b.parameters.RetryInterval)
+			logConsole("Application Retried To Connect RabbitMq")
 			continue
 		}
 		b.onClose()
+		logConsole(	"Application  Connected RabbitMq")
 		b.SignalConnectionStatus(true)
 
 		break
@@ -59,6 +61,7 @@ func (b *broker) onClose() {
 	go func() {
 		err := <-b.connection.NotifyClose(make(chan *amqp.Error))
 		if err != nil {
+			logConsole("RabbitMq Connection Is Down")
 			b.SignalConnectionStatus(false)
 			return
 		}

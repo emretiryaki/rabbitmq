@@ -7,8 +7,6 @@ import (
 	"golang.org/x/sync/errgroup"
 	"net"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
 )
 
@@ -20,63 +18,40 @@ var (
 	RETRY_INTERVAL= time.Second
 )
 
-func NewRabbitmqServer(uri string, withFunc ...WithFunc) *MessageBrokerServer {
+type (
 
-	rootCtx, shutdownFn := context.WithCancel(context.Background())
-	childRoutines, childCtx := errgroup.WithContext(rootCtx)
-
-	messageBrokerServer := &MessageBrokerServer{
-		context:       childCtx,
-		shutdownFn:    shutdownFn,
-		childRoutines: childRoutines,
-		parameters: MessageBrokerParameter{
-			Uri:             uri,
-			ConcurrentLimit: CONCURRENT_LIMIT,
-			RetryCount:      RETRY_COUNT,
-			PrefetchCount:   PREFECT_COUNT,
-			RetryInterval:   RETRY_INTERVAL,
-		},
-		messageBroker: NewMessageBroker(),
+	Message struct {
+		Payload       []byte
+		CorrelationId string
+		MessageId     string
+		Timestamp     time.Time
 	}
 
-	for _, handler := range withFunc {
-		if err := handler(messageBrokerServer); err != nil {
-			panic(err)
-		}
+	MessageBrokerServer struct {
+		context            context.Context
+		shutdownFn         context.CancelFunc
+		childRoutines      *errgroup.Group
+		parameters         MessageBrokerParameter
+		shutdownReason     string
+		shutdownInProgress bool
+		Consumers          []Consumer
+		messageBroker      MessageBroker
 	}
-	return messageBrokerServer
-}
-type Message struct {
-	Payload       []byte
-	CorrelationId string
-	MessageId     string
-	Timestamp     time.Time
-}
-type MessageBrokerServer struct {
-	context            context.Context
-	shutdownFn         context.CancelFunc
-	childRoutines      *errgroup.Group
-	parameters         MessageBrokerParameter
-	shutdownReason     string
-	shutdownInProgress bool
-	Consumers          []Consumer
-	messageBroker      MessageBroker
-}
-type WithFunc func(*MessageBrokerServer) error
 
-type handleConsumer func(message Message) error
+	Consumer struct {
+		queueName         string
+		exchangeName      string
+		routingKey        string
+		handleConsumer    handleConsumer
+		errorQueueName    string
+		errorExchangeName string
+		channel           *BrokerChannel
+		startConsumerCn       chan bool
+	}
 
-type Consumer struct {
-	queueName         string
-	exchangeName      string
-	routingKey        string
-	handleConsumer    handleConsumer
-	errorQueueName    string
-	errorExchangeName string
-	channel           *BrokerChannel
-	startConsumerCn       chan bool
-}
-
+	WithFunc func(*MessageBrokerServer) error
+	handleConsumer func(message Message) error
+)
 
 func PrefetchCount(prefetchCount int) WithFunc {
 	return func(m *MessageBrokerServer) error {
@@ -91,39 +66,6 @@ func RetryCount(retryCount int,retryInterval time.Duration) WithFunc {
 		m.parameters.RetryInterval=retryInterval
 		return nil
 	}
-}
-
-func (mBrokerServer *MessageBrokerServer) Shutdown(reason string) {
-	mBrokerServer.shutdownReason = reason
-	mBrokerServer.shutdownInProgress = true
-
-	mBrokerServer.shutdownFn()
-
-	mBrokerServer.childRoutines.Wait()
-
-}
-
-func ListenToSystemSignals(server *MessageBrokerServer) {
-	signalChan := make(chan os.Signal, 1)
-	ignoreChan := make(chan os.Signal, 1)
-
-	signal.Notify(ignoreChan, syscall.SIGHUP)
-	signal.Notify(signalChan, os.Interrupt, os.Kill, syscall.SIGTERM)
-
-	select {
-	case sig := <-signalChan:
-		server.Shutdown(fmt.Sprintf("System signal: %s", sig))
-	}
-}
-
-func (mBrokerServer *MessageBrokerServer) Exit(reason error) int {
-
-	code := 1
-	if reason == context.Canceled && mBrokerServer.shutdownReason != "" {
-		reason = fmt.Errorf(mBrokerServer.shutdownReason)
-		code = 0
-	}
-	return code
 }
 
 func (mBrokerServer *MessageBrokerServer) RunConsumers() error {
@@ -289,6 +231,30 @@ func sendSystemNotification(state string) error {
 	return err
 
 }
+
+
+func (mBrokerServer *MessageBrokerServer) Shutdown(reason string) {
+	mBrokerServer.shutdownReason = reason
+	mBrokerServer.shutdownInProgress = true
+
+	mBrokerServer.shutdownFn()
+
+	mBrokerServer.childRoutines.Wait()
+
+}
+
+
+func (mBrokerServer *MessageBrokerServer) Exit(reason error) int {
+
+	code := 1
+	if reason == context.Canceled && mBrokerServer.shutdownReason != "" {
+		reason = fmt.Errorf(mBrokerServer.shutdownReason)
+		code = 0
+	}
+	return code
+}
+
+
 func (consumer *Consumer) createExchange(exchange string, routingKey string) error {
 	var err = consumer.channel.channel.ExchangeDeclare(exchange, exchangeType(routingKey), true, false, false, false, nil)
 	if err != nil {
@@ -302,10 +268,31 @@ func (consumer *Consumer) createQueue(destinationExchange string, queueName stri
 	q, _ := consumer.channel.channel.QueueDeclare(queueName, true, false, false, false, nil)
 	consumer.channel.channel.QueueBind(q.Name, routingKey, destinationExchange, false, nil)
 }
-func exchangeType(routingKey string) string {
-	var exchangeType = "fanout"
-	if routingKey != "" {
-		exchangeType = "direct"
+
+
+func NewRabbitmqServer(uri string, withFunc ...WithFunc) *MessageBrokerServer {
+
+	rootCtx, shutdownFn := context.WithCancel(context.Background())
+	childRoutines, childCtx := errgroup.WithContext(rootCtx)
+
+	messageBrokerServer := &MessageBrokerServer{
+		context:       childCtx,
+		shutdownFn:    shutdownFn,
+		childRoutines: childRoutines,
+		parameters: MessageBrokerParameter{
+			Uri:             uri,
+			ConcurrentLimit: CONCURRENT_LIMIT,
+			RetryCount:      RETRY_COUNT,
+			PrefetchCount:   PREFECT_COUNT,
+			RetryInterval:   RETRY_INTERVAL,
+		},
+		messageBroker: NewMessageBroker(),
 	}
-	return exchangeType
+
+	for _, handler := range withFunc {
+		if err := handler(messageBrokerServer); err != nil {
+			panic(err)
+		}
+	}
+	return messageBrokerServer
 }

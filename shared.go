@@ -35,3 +35,11 @@ func  logConsole(message string){
 type Log struct {
 	Message   string
 }
+
+func exchangeType(routingKey string) string {
+	var exchangeType = "fanout"
+	if routingKey != "" {
+		exchangeType = "direct"
+	}
+	return exchangeType
+}

@@ -5,34 +5,37 @@ import (
 	"time"
 )
 
-type MessageBroker interface {
-	CreateChannel ()  (*BrokerChannel,error)
-	CreateConnection (parameters MessageBrokerParameter) error
-	SignalConnectionStatus (status bool)
-	SignalConnection()  (chan bool)
-}
+type (
 
-type broker struct {
-	parameters MessageBrokerParameter
-	connection *amqp.Connection
-	connNotifyChannel chan bool
-}
+	MessageBroker interface {
+		CreateChannel ()  (*BrokerChannel,error)
+		CreateConnection (parameters MessageBrokerParameter) error
+		SignalConnectionStatus (status bool)
+		SignalConnection()  (chan bool)
+	}
 
-type MessageBrokerParameter struct {
-	Uri             string
-	PrefetchCount   int
-	RetryCount      int
-	ConcurrentLimit int
-	RetryInterval   time.Duration
-}
+	broker struct {
+		parameters MessageBrokerParameter
+		connection *amqp.Connection
+		connNotifyChannel chan bool
+	}
 
-type BrokerChannel struct {
-	channel         *amqp.Channel
-	prefetchCount   int
-	retryCount      int
-	concurrentLimit int
-	retryInterval   time.Duration
-}
+	MessageBrokerParameter struct {
+		Uri             string
+		PrefetchCount   int
+		RetryCount      int
+		ConcurrentLimit int
+		RetryInterval   time.Duration
+	}
+
+	BrokerChannel struct {
+		channel         *amqp.Channel
+		prefetchCount   int
+		retryCount      int
+		concurrentLimit int
+		retryInterval   time.Duration
+	}
+)
 
 func (b *broker) CreateConnection(parameters MessageBrokerParameter) (error) {
 

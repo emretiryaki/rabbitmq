@@ -11,8 +11,8 @@ func getGuid() string {
 	return uuid.New().String()
 }
 
-func isGuid(paramater string) bool {
-	_, err := uuid.Parse(paramater)
+func isGuid(p string) bool {
+	_, err := uuid.Parse(p)
 	if err != nil {
 		return false
 	}
@@ -32,14 +32,14 @@ func  logConsole(message string){
 	fmt.Println(string(logMessage))
 }
 
-type Log struct {
-	Message   string
-}
-
 func exchangeType(routingKey string) string {
 	var exchangeType = "fanout"
 	if routingKey != "" {
 		exchangeType = "direct"
 	}
 	return exchangeType
+}
+
+type Log struct {
+	Message   string
 }

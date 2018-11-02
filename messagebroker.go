@@ -14,12 +14,6 @@ type (
 		SignalConnection()  (chan bool)
 	}
 
-	broker struct {
-		parameters MessageBrokerParameter
-		connection *amqp.Connection
-		connNotifyChannel chan bool
-	}
-
 	MessageBrokerParameter struct {
 		Uri             string
 		PrefetchCount   int
@@ -35,6 +29,13 @@ type (
 		concurrentLimit int
 		retryInterval   time.Duration
 	}
+	broker struct {
+		parameters MessageBrokerParameter
+		connection *amqp.Connection
+		connNotifyChannel chan bool
+	}
+
+
 )
 
 func (b *broker) CreateConnection(parameters MessageBrokerParameter) (error) {

@@ -21,7 +21,7 @@ func TestGetBytes(t *testing.T) {
 func TestConvertPublishMessage(t *testing.T) {
 	var comlexType = ExampleMessage{Id: "1"}
 	var guid = getGuid()
-	var publishingMessage = convertPublishMessage(publishMessage{Payload: comlexType, CorrelationId: guid, Exchange: getExchangeName(comlexType)})
+	var publishingMessage = convertToPublishMessage(publishMessage{Payload: comlexType, CorrelationId: guid, Exchange: getExchangeName(comlexType)})
 	if publishingMessage.CorrelationId != guid {
 		t.Errorf("Test Fail : Actual [%d]\tExptected [%d]\n", publishingMessage.CorrelationId, guid)
 	}

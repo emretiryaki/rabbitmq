@@ -11,18 +11,18 @@ RabbitMq Wrapper is the a client API for RabbitMQ.
 
 To connect to a RabbitMQ broker...
 
-    	var messageBus=rabbit.NewRabbitmqServer("amqp://guest:guest@localhost:5672/")
+    	var rabbitClient=rabbit.NewRabbitMqClient("amqp://guest:guest@localhost:5672/")
 
 To connect to a RabbitMQ broker with retry policy 
  * Consumer retries two times immediately if an error occured
 
-      	var messageBus=rabbit.NewRabbitmqServer("amqp://guest:guest@localhost:5672/",
+      	var rabbitClient=rabbit.NewRabbitMqClient("amqp://guest:guest@localhost:5672/",
                                                   rabbit.RetryCount(2,time.Duration(0)))
   
  * Create goroutines and consume messages asynchronously using PrefetchCount Prefix. 
  Create as number of  PrefetchCount as goroutines .
  
-       	var messageBus=rabbit.NewRabbitmqServer("amqp://guest:guest@localhost:5672/",
+       	var rabbitClient=rabbit.NewRabbitMqClient("amqp://guest:guest@localhost:5672/",
                        		rabbit.PrefetchCount(3))
                                                     
  To send a message 
@@ -43,7 +43,7 @@ To connect to a RabbitMQ broker with retry policy
         	}
         
   
-        rabbitServer.AddConsumer("In.Person", "PersonV1","", onConsumed)
+        rabbitClient.AddConsumer("In.Person", "PersonV1","", onConsumed)
     
  To Consume multiple messages
 
@@ -68,7 +68,7 @@ To connect to a RabbitMQ broker with retry policy
     		fmt.Println(time.Now().Format("Mon, 02 Jan 2006 15:04:05 "), " Message:", consumeMessage)
     		return nil
     	}
-    	rabbitServer.AddConsumer("In.Person3", "PersonV3","", onConsumed2)
-    	rabbitServer.AddConsumer("In.Person", "PersonV1","", onConsumed)
+    	rabbitClient.AddConsumer("In.Person3", "PersonV3","", onConsumed2)
+    	rabbitClient.AddConsumer("In.Person", "PersonV1","", onConsumed)
     
-    	rabbitServer.RunConsumers()
+    	rabbitClient.RunConsumers()

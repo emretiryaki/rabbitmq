@@ -32,7 +32,7 @@ type (
 
 func main() {
 
-	var  rabbitServer= rabbit.NewRabbitmqServer("amqp://guest:guest@localhost:5672/",rabbit.RetryCount(2, time.Duration(0)),rabbit.PrefetchCount(3))
+	var  rabbitClient= rabbit.NewRabbitMqClient("amqp://guest:guest@localhost:5672/",rabbit.RetryCount(2, time.Duration(0)),rabbit.PrefetchCount(3))
 
 	onConsumed := func(message rabbit.Message) error {
 
@@ -55,10 +55,10 @@ func main() {
 		fmt.Println(time.Now().Format("Mon, 02 Jan 2006 15:04:05 "), " Message:", consumeMessage)
 		return nil
 	}
-	rabbitServer.AddConsumer("In.Person3", "PersonV3","", onConsumed2)
-	rabbitServer.AddConsumer("In.Person", "PersonV1","", onConsumed)
+	rabbitClient.AddConsumer("In.Person3", "PersonV3","", onConsumed2)
+	rabbitClient.AddConsumer("In.Person", "PersonV1","", onConsumed)
 
-	rabbitServer.RunConsumers()
+	rabbitClient.RunConsumers()
 
 
 }

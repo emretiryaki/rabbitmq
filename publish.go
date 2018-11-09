@@ -10,13 +10,13 @@ import (
 )
 
 var (
-	deliveryMode uint8 = 2
-	HEADER_ERROR ="Error"
-	HEADER_RETRY_COUNT="RetryCount"
+	deliveryMode     uint8 = 2
+	headerError            ="Error"
+	headerRetryCount      ="RetryCount"
 )
 
 type (
-	BuilderPublishFunc func(*publishMessage) error
+	builderPublishFunc func(*publishMessage) error
 
 	publishMessage struct {
 		CorrelationId string
@@ -25,7 +25,7 @@ type (
 	}
 )
 
-func convertToPublishMessage(payload interface{} , builders ...BuilderPublishFunc) amqp.Publishing {
+func convertToPublishMessage(payload interface{} , builders ...builderPublishFunc) amqp.Publishing {
 
 	var message = publishMessage {Payload: payload }
 
@@ -51,11 +51,11 @@ func convertToPublishMessage(payload interface{} , builders ...BuilderPublishFun
 
 
 
-func convertErrorPublishMessage(correlationId string, payload []byte, retryCount int, err error) amqp.Publishing {
+func errorPublishMessage(correlationId string, payload []byte, retryCount int, err error) amqp.Publishing {
 
 	headers := make(map[string]interface{})
-	headers[HEADER_RETRY_COUNT] = strconv.Itoa(retryCount)
-	headers[HEADER_ERROR] = err.Error()
+	headers[headerRetryCount] = strconv.Itoa(retryCount)
+	headers[headerError] = err.Error()
 
 	return amqp.Publishing{
 		MessageId:       getGuid(),
@@ -73,7 +73,7 @@ func getBytes(key interface{}) ([]byte, error) {
 	return json.Marshal(key)
 }
 
-func WithCorrelationId(correlationId string) BuilderPublishFunc {
+func WithCorrelationId(correlationId string) builderPublishFunc {
 
 	return func(m *publishMessage) error {
 		if isGuid(correlationId) {

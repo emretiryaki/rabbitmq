@@ -20,7 +20,7 @@ type (
 func main() {
 
 
-	var  rabbitServer= rabbit.NewRabbitmqServer("amqp://guest:guest@localhost:5672/",rabbit.RetryCount(2,time.Duration(0)))
+	var  rabbitClient= rabbit.NewRabbitMqClient("amqp://guest:guest@localhost:5672/",rabbit.RetryCount(2,time.Duration(0)))
 
 
 	onConsumed := func(message rabbit.Message) error {
@@ -36,7 +36,7 @@ func main() {
 		panic("panic")
 		return nil
 	}
-	rabbitServer.AddConsumer("In.Person3", "PersonV3","", onConsumed)
-	rabbitServer.RunConsumers()
+	rabbitClient.AddConsumer("In.Person3", "PersonV3","", onConsumed)
+	rabbitClient.RunConsumers()
 
 }

@@ -36,7 +36,7 @@ func main() {
 		panic("panic")
 		return nil
 	}
-	rabbitClient.AddConsumer("In.Person3", "PersonV3","", onConsumed)
+	rabbitClient.AddConsumer("In.Person3", "PersonV3","",rabbit.Fanout, onConsumed)
 	rabbitClient.RunConsumers()
 
 }

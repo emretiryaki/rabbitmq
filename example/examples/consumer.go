@@ -55,8 +55,8 @@ func main() {
 		fmt.Println(time.Now().Format("Mon, 02 Jan 2006 15:04:05 "), " Message:", consumeMessage)
 		return nil
 	}
-	rabbitClient.AddConsumer("In.Person3", "PersonV3","", onConsumed2)
-	rabbitClient.AddConsumer("In.Person", "PersonV1","", onConsumed)
+	rabbitClient.AddConsumer("In.Person3", "PersonV3","", rabbit.Fanout,onConsumed2)
+	rabbitClient.AddConsumer("In.Person", "PersonV1","test", rabbit.Direct,onConsumed)
 
 	rabbitClient.RunConsumers()
 

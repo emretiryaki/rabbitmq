@@ -13,10 +13,17 @@ import (
 var (
 	ERRORPREFIX     = ".Error"
 	CONCURRENTLIMIT = 1
-	RETRYCOUNT      =    0
+	RETRYCOUNT      = 0
 	PREFECTCOUNT    = 1
 	RETRY_INTERVAL  = time.Second
 )
+
+const (
+	Direct ExchangeType = 1
+	Fanout ExchangeType = 2
+)
+
+type ExchangeType int
 
 func NewRabbitMqClient(uri string, withFunc ...withFunc) *MessageBrokerServer {
 
@@ -44,6 +51,7 @@ func NewRabbitMqClient(uri string, withFunc ...withFunc) *MessageBrokerServer {
 	}
 	return messageBrokerServer
 }
+
 type Message struct {
 	Payload       []byte
 	CorrelationId string
@@ -73,8 +81,8 @@ type Consumer struct {
 	errorExchangeName string
 	brokerChannel     *BrokerChannel
 	startConsumerCn   chan bool
+	exchangeType      ExchangeType
 }
-
 
 func PrefetchCount(prefetchCount int) withFunc {
 	return func(m *MessageBrokerServer) error {
@@ -83,10 +91,10 @@ func PrefetchCount(prefetchCount int) withFunc {
 	}
 }
 
-func RetryCount(retryCount int,retryInterval time.Duration) withFunc {
+func RetryCount(retryCount int, retryInterval time.Duration) withFunc {
 	return func(m *MessageBrokerServer) error {
 		m.parameters.RetryCount = retryCount
-		m.parameters.RetryInterval=retryInterval
+		m.parameters.RetryInterval = retryInterval
 		return nil
 	}
 }
@@ -100,7 +108,6 @@ func (m *MessageBrokerServer) Shutdown(reason string) {
 	m.childRoutines.Wait()
 
 }
-
 
 func (m *MessageBrokerServer) Exit(reason error) int {
 
@@ -153,9 +160,9 @@ func (m *MessageBrokerServer) RunConsumers() error {
 							panic(err)
 						}
 
-						consumer.createExchange(consumer.exchangeName, consumer.routingKey)
-						consumer.createQueue(consumer.exchangeName, consumer.queueName, consumer.routingKey)
-						consumer.createQueue(consumer.errorQueueName, consumer.errorExchangeName, consumer.routingKey)
+						consumer.createExchange(consumer.exchangeName, consumer.exchangeType)
+						consumer.createQueue(consumer.exchangeName, consumer.queueName, consumer.routingKey,consumer.exchangeType)
+						consumer.createQueue(consumer.errorQueueName, consumer.errorExchangeName, "",Fanout)
 
 						consumer.brokerChannel.channel.Qos(m.parameters.PrefetchCount, 0, false)
 
@@ -178,11 +185,11 @@ func (m *MessageBrokerServer) RunConsumers() error {
 													consumer.brokerChannel.channel.Publish(consumer.errorExchangeName, "", false, false, errorPublishMessage(d.CorrelationId, d.Body, m.parameters.RetryCount, err))
 													d.Ack(false)
 												}
-												if  err == nil {
-													err = fmt.Errorf("panic occured In Consumer  %q (message %d)",d.CorrelationId, d.Body )
+												if err == nil {
+													err = fmt.Errorf("panic occured In Consumer  %q (message %d)", d.CorrelationId, d.Body)
 													consumer.brokerChannel.channel.Publish(consumer.errorExchangeName, "", false, false, errorPublishMessage(d.CorrelationId, d.Body, m.parameters.RetryCount, err))
 													d.Ack(false)
-													retry =false
+													retry = false
 												}
 												return
 											}
@@ -208,7 +215,6 @@ func (m *MessageBrokerServer) RunConsumers() error {
 	return m.childRoutines.Wait()
 }
 
-
 func (consumer Consumer) listenToQueue(queueName string) (<-chan amqp.Delivery, error) {
 
 	msg, err := consumer.brokerChannel.channel.Consume(queueName,
@@ -226,7 +232,7 @@ func (consumer Consumer) listenToQueue(queueName string) (<-chan amqp.Delivery, 
 	return msg, nil
 }
 
-func (m *MessageBrokerServer) AddConsumer(queueName string, exchangeName string, routingKey string, handleConsumer handleConsumer) {
+func (m *MessageBrokerServer) AddConsumer(queueName string, exchangeName string, routingKey string, exchangeType ExchangeType, handleConsumer handleConsumer) {
 
 	var consumer = Consumer{
 		queueName:         queueName,
@@ -235,7 +241,8 @@ func (m *MessageBrokerServer) AddConsumer(queueName string, exchangeName string,
 		handleConsumer:    handleConsumer,
 		errorQueueName:    queueName + ERRORPREFIX,
 		errorExchangeName: queueName + ERRORPREFIX,
-		startConsumerCn:       make(chan bool),
+		startConsumerCn:   make(chan bool),
+		exchangeType:      exchangeType,
 	}
 
 	var isAlreadyDeclareQueue bool
@@ -276,23 +283,31 @@ func sendSystemNotification(state string) error {
 	return err
 
 }
-func (consumer *Consumer) createExchange(exchange string, routingKey string) error {
-	var err = consumer.brokerChannel.channel.ExchangeDeclare(exchange, exchangeType(routingKey), true, false, false, false, nil)
+func (consumer *Consumer) createExchange(exchange string, exchangeType ExchangeType) error {
+
+	var err = consumer.brokerChannel.channel.ExchangeDeclare(exchange, convertRabbitmqExchangeType(exchangeType), true, false, false, false, nil)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (consumer *Consumer) createQueue(destinationExchange string, queueName string, routingKey string) {
-	consumer.brokerChannel.channel.ExchangeDeclare(destinationExchange, "fanout", true, false, false, false, nil)
+func (consumer *Consumer) createQueue(destinationExchange string, queueName string, routingKey string, exchangeType ExchangeType) {
+
+	consumer.brokerChannel.channel.ExchangeDeclare(destinationExchange,  convertRabbitmqExchangeType(exchangeType), true, false, false, false, nil)
 	q, _ := consumer.brokerChannel.channel.QueueDeclare(queueName, true, false, false, false, nil)
 	consumer.brokerChannel.channel.QueueBind(q.Name, routingKey, destinationExchange, false, nil)
 }
-func exchangeType(routingKey string) string {
-	var exchangeType = "fanout"
-	if routingKey != "" {
-		exchangeType = "direct"
+
+func convertRabbitmqExchangeType(exchangeType ExchangeType) (string)  {
+	var rabbitmqExchangeType  string
+	switch exchangeType {
+	case Direct:
+		rabbitmqExchangeType= amqp.ExchangeDirect
+		break
+	case Fanout:
+		rabbitmqExchangeType= amqp.ExchangeFanout
+		break
 	}
-	return exchangeType
+	return rabbitmqExchangeType
 }

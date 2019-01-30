@@ -22,7 +22,7 @@ func main() {
 		return nil
 	}
 
-	rabbitClient.AddConsumer("In.CustomerV1", "CustomerV1","", onConsumed)
+	rabbitClient.AddConsumer("In.CustomerV1", "CustomerV1","",rabbit.Fanout, onConsumed)
 	rabbitClient.RunConsumers()
 
 

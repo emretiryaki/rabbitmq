@@ -21,6 +21,7 @@ var (
 const (
 	Direct ExchangeType = 1
 	Fanout ExchangeType = 2
+	Topic ExchangeType = 3
 )
 
 type ExchangeType int
@@ -307,6 +308,9 @@ func convertRabbitmqExchangeType(exchangeType ExchangeType) (string)  {
 		break
 	case Fanout:
 		rabbitmqExchangeType= amqp.ExchangeFanout
+		break
+	case Topic:
+		rabbitmqExchangeType= amqp.ExchangeTopic
 		break
 	}
 	return rabbitmqExchangeType

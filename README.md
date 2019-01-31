@@ -4,7 +4,7 @@ RabbitMq Wrapper is the a client API for RabbitMQ.
 * A  wrapper over [amqp](https://github.com/streadway/amqp) exchanges and queues.
 * In memory retries for consuming messages when an error occured
 * CorrelationId and MessageId structure
-* Exchange Types With Direct and Fanout
+* Exchange Types With Direct and Fanout and Topic
 * Retry policy (immediately , interval)
 * Multiple consumers In a single process
 * Create goroutines and consume messages asynchronously 

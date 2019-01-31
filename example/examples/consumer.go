@@ -55,9 +55,21 @@ func main() {
 		fmt.Println(time.Now().Format("Mon, 02 Jan 2006 15:04:05 "), " Message:", consumeMessage)
 		return nil
 	}
-	rabbitClient.AddConsumer("In.Person3", "PersonV3","", rabbit.Fanout,onConsumed2)
-	rabbitClient.AddConsumer("In.Person", "PersonV1","test", rabbit.Direct,onConsumed)
 
+	onConsumed3 := func(message rabbit.Message) error {
+
+		var consumeMessage PersonV4
+		var err= json.Unmarshal(message.Payload, &consumeMessage)
+		if err != nil {
+			return err
+		}
+		fmt.Println(time.Now().Format("Mon, 02 Jan 2006 15:04:05 "), " Message:", consumeMessage)
+		return nil
+	}
+
+	rabbitClient.AddConsumer("In.Person_Fanout", "PersonV3_Fanout","", rabbit.Fanout,onConsumed2)
+	rabbitClient.AddConsumer("In.Person_Direct", "PersonV1_Direct","person", rabbit.Direct,onConsumed)
+	rabbitClient.AddConsumer("In.Person_Topic", "PersonV4_Topic","person", rabbit.Topic,onConsumed3)
 	rabbitClient.RunConsumers()
 
 

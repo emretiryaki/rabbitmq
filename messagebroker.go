@@ -6,12 +6,11 @@ import (
 )
 
 type (
-
 	MessageBroker interface {
-		CreateChannel ()  (*BrokerChannel,error)
-		CreateConnection (parameters MessageBrokerParameter) error
-		SignalConnectionStatus (status bool)
-		SignalConnection()  (chan bool)
+		CreateChannel() (*BrokerChannel, error)
+		CreateConnection(parameters MessageBrokerParameter) error
+		SignalConnectionStatus(status bool)
+		SignalConnection() (chan bool)
 	}
 
 	MessageBrokerParameter struct {
@@ -30,12 +29,10 @@ type (
 		retryInterval   time.Duration
 	}
 	broker struct {
-		parameters MessageBrokerParameter
-		connection *amqp.Connection
+		parameters        MessageBrokerParameter
+		connection        *amqp.Connection
 		connNotifyChannel chan bool
 	}
-
-
 )
 
 func (b *broker) CreateConnection(parameters MessageBrokerParameter) (error) {
@@ -52,7 +49,7 @@ func (b *broker) CreateConnection(parameters MessageBrokerParameter) (error) {
 			continue
 		}
 		b.onClose()
-		logConsole(	"Application  Connected RabbitMq")
+		logConsole("Application  Connected RabbitMq")
 		b.SignalConnectionStatus(true)
 
 		break
@@ -72,7 +69,7 @@ func (b *broker) onClose() {
 	}()
 }
 
-func (b *broker)  CreateChannel()  (*BrokerChannel,error) {
+func (b *broker) CreateChannel() (*BrokerChannel, error) {
 
 	brokerChannel, err := b.connection.Channel()
 	if err != nil {
@@ -96,13 +93,11 @@ func (b *broker) SignalConnectionStatus(status bool) {
 }
 
 func (b *broker) SignalConnection() (chan bool) {
-	 return b.connNotifyChannel
+	return b.connNotifyChannel
 }
 
-
-func NewMessageBroker () MessageBroker {
-	brokerClient := &broker{connNotifyChannel:make(chan bool)}
+func NewMessageBroker() MessageBroker {
+	brokerClient := &broker{connNotifyChannel: make(chan bool)}
 	brokerClient.SignalConnectionStatus(false)
 	return brokerClient
 }
-

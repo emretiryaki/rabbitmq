@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"fmt"
 	"encoding/json"
+	"github.com/streadway/amqp"
 )
 
 func getGuid() string {
@@ -32,14 +33,23 @@ func  logConsole(message string){
 	fmt.Println(string(logMessage))
 }
 
-func exchangeType(routingKey string) string {
-	var exchangeType = "fanout"
-	if routingKey != "" {
-		exchangeType = "direct"
-	}
-	return exchangeType
-}
 
+func convertRabbitmqExchangeType(exchangeType ExchangeType) (string) {
+
+	var rabbitmqExchangeType string
+	switch exchangeType {
+	case Direct:
+		rabbitmqExchangeType = amqp.ExchangeDirect
+		break
+	case Fanout:
+		rabbitmqExchangeType = amqp.ExchangeFanout
+		break
+	case Topic:
+		rabbitmqExchangeType = amqp.ExchangeTopic
+		break
+	}
+	return rabbitmqExchangeType
+}
 type Log struct {
 	Message   string
 }

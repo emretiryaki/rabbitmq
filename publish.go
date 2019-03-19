@@ -11,8 +11,8 @@ import (
 
 var (
 	deliveryMode     uint8 = 2
-	headerError            ="Error"
-	headerRetryCount      ="RetryCount"
+	headerError            = "Error"
+	headerRetryCount       = "RetryCount"
 )
 
 type (
@@ -23,16 +23,21 @@ type (
 		Exchange      string
 		Payload       interface{}
 	}
+
+	Publisher struct {
+		exchangeName  string
+		routingKey    string
+		brokerChannel *BrokerChannel
+		exchangeType  ExchangeType
+	}
 )
 
-func convertToPublishMessage(payload interface{} , builders ...builderPublishFunc) amqp.Publishing {
+func convertToPublishMessage(payload interface{}, builders ...builderPublishFunc) amqp.Publishing {
 
-	var message = publishMessage {Payload: payload }
-
+	var message = publishMessage{Payload: payload}
 	for _, handler := range builders {
 		handler(&message)
 	}
-
 	if message.CorrelationId == "" {
 		message.CorrelationId = getGuid()
 	}
@@ -48,8 +53,6 @@ func convertToPublishMessage(payload interface{} , builders ...builderPublishFun
 		ContentType:     "application/json",
 	}
 }
-
-
 
 func errorPublishMessage(correlationId string, payload []byte, retryCount int, err error) amqp.Publishing {
 
@@ -83,4 +86,29 @@ func WithCorrelationId(correlationId string) builderPublishFunc {
 			return errors.New("invalid UUID format")
 		}
 	}
+}
+
+func (m *MessageBrokerServer) Publish(exchangeName string, routing string, ) {
+
+}
+
+func (m *MessageBrokerServer) AddPublisher(exchangeName string, routingKey string, exchangeType ExchangeType) {
+
+	var publisher = Publisher{
+		routingKey:   routingKey,
+		exchangeName: exchangeName,
+		exchangeType: exchangeType,
+	}
+
+	var isAlreadyDeclareExchange bool
+	for _, item := range m.publishers {
+		if item.exchangeName == exchangeName {
+			isAlreadyDeclareExchange = true
+		}
+	}
+
+	if !isAlreadyDeclareExchange {
+		m.publishers = append(m.publishers, publisher)
+	}
+
 }

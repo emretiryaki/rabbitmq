@@ -9,8 +9,7 @@ import (
 
 
 func main() {
-
-	var  rabbitClient= rabbit.NewRabbitMqClient("amqp://guest:guest@localhost:5672/",rabbit.PrefetchCount(3))
+	var  rabbitClient= rabbit.NewRabbitMqClient([]string{"127.0.0.1"},"guest","guest","",rabbit.PrefetchCount(3))
 
 	onConsumed := func(message rabbit.Message) error {
 		var consumeMessage string

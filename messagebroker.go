@@ -1,25 +1,29 @@
 package rabbitmq
 
 import (
+	"fmt"
 	"github.com/streadway/amqp"
 	"time"
 )
 
 type (
-
 	MessageBroker interface {
-		CreateChannel ()  (*BrokerChannel,error)
-		CreateConnection (parameters MessageBrokerParameter) error
-		SignalConnectionStatus (status bool)
-		SignalConnection()  (chan bool)
+		CreateChannel() (*BrokerChannel, error)
+		CreateConnection(parameters MessageBrokerParameter) error
+		SignalConnectionStatus(status bool)
+		SignalConnection() (chan bool)
 	}
 
 	MessageBrokerParameter struct {
-		Uri             string
-		PrefetchCount   int
-		RetryCount      int
-		ConcurrentLimit int
-		RetryInterval   time.Duration
+		Nodes             []string
+		PrefetchCount     int
+		RetryCount        int
+		ConcurrentLimit   int
+		RetryInterval     time.Duration
+		UserName          string
+		Password          string
+		selectedNodeIndex int
+		VirtualHost       string
 	}
 
 	BrokerChannel struct {
@@ -30,12 +34,10 @@ type (
 		retryInterval   time.Duration
 	}
 	broker struct {
-		parameters MessageBrokerParameter
-		connection *amqp.Connection
+		parameters        MessageBrokerParameter
+		connection        *amqp.Connection
 		connNotifyChannel chan bool
 	}
-
-
 )
 
 func (b *broker) CreateConnection(parameters MessageBrokerParameter) (error) {
@@ -46,13 +48,14 @@ func (b *broker) CreateConnection(parameters MessageBrokerParameter) (error) {
 
 	for {
 
-		if b.connection, err = amqp.Dial(b.parameters.Uri); err != nil {
+		if b.connection, err = amqp.Dial(b.chooseNodes()); err != nil {
 			time.Sleep(b.parameters.RetryInterval)
+
 			logConsole("Application Retried To Connect RabbitMq")
 			continue
 		}
 		b.onClose()
-		logConsole(	"Application  Connected RabbitMq")
+		logConsole("Application  Connected RabbitMq")
 		b.SignalConnectionStatus(true)
 
 		break
@@ -61,6 +64,19 @@ func (b *broker) CreateConnection(parameters MessageBrokerParameter) (error) {
 	return err
 
 }
+
+// TODO: This crashes if we define no servers in our config
+func (b *broker) chooseNodes() string {
+	if b.parameters.selectedNodeIndex== len(b.parameters.Nodes){
+		b.parameters.selectedNodeIndex=0
+	}
+	var selectedNode = b.parameters.Nodes[b.parameters.selectedNodeIndex]
+	b.parameters.selectedNodeIndex++
+  	logConsole(fmt.Sprintf("Started To Listen On Node %s",selectedNode))
+	return   fmt.Sprintf("amqp://%s:%s@%s/%s",b.parameters.UserName,b.parameters.Password, selectedNode,b.parameters.VirtualHost)
+
+}
+
 func (b *broker) onClose() {
 	go func() {
 		err := <-b.connection.NotifyClose(make(chan *amqp.Error))
@@ -72,7 +88,7 @@ func (b *broker) onClose() {
 	}()
 }
 
-func (b *broker)  CreateChannel()  (*BrokerChannel,error) {
+func (b *broker) CreateChannel() (*BrokerChannel, error) {
 
 	brokerChannel, err := b.connection.Channel()
 	if err != nil {
@@ -96,13 +112,11 @@ func (b *broker) SignalConnectionStatus(status bool) {
 }
 
 func (b *broker) SignalConnection() (chan bool) {
-	 return b.connNotifyChannel
+	return b.connNotifyChannel
 }
 
-
-func NewMessageBroker () MessageBroker {
-	brokerClient := &broker{connNotifyChannel:make(chan bool)}
+func NewMessageBroker() MessageBroker {
+	brokerClient := &broker{connNotifyChannel: make(chan bool)}
 	brokerClient.SignalConnectionStatus(false)
 	return brokerClient
 }
-

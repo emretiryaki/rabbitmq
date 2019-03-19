@@ -8,22 +8,23 @@ RabbitMq Wrapper is the a client API for RabbitMQ.
 * Retry policy (immediately , interval)
 * Multiple consumers In a single process
 * Create goroutines and consume messages asynchronously 
+* Retry to connect another node  When RabbitMq Node is Down or Broken Connection (mini load balancing :)
 * Some extra features while publishing message  (will be added) 
 
 To connect to a RabbitMQ broker...
 
-    	var rabbitClient=rabbit.NewRabbitMqClient("amqp://guest:guest@localhost:5672/")
+    	var rabbitClient=rabbit.NewRabbitMqClient([]string{"127.0.0.1","127.0.0.2"},"guest","guest","/virtualhost")
 
 To connect to a RabbitMQ broker with retry policy 
  * Consumer retries two times immediately if an error occured
 
-      	var rabbitClient=rabbit.NewRabbitMqClient("amqp://guest:guest@localhost:5672/",
+      	var rabbitClient=rabbit.NewRabbitMqClient([]string{"127.0.0.1","127.0.0.2"},"guest","guest","/virtualhost",
                                                   rabbit.RetryCount(2,time.Duration(0)))
   
  * Create goroutines and consume messages asynchronously using PrefetchCount Prefix. 
  Create as number of  PrefetchCount as goroutines .
  
-       	var rabbitClient=rabbit.NewRabbitMqClient("amqp://guest:guest@localhost:5672/",
+       	var rabbitClient=rabbit.NewRabbitMqClient([]string{"127.0.0.1","127.0.0.2"},"guest","guest","/virtualhost",
                        		rabbit.PrefetchCount(3))
                                                     
  To send a message 

@@ -41,7 +41,7 @@ type (
 	withFunc func(*MessageBrokerServer) error
 )
 
-func NewRabbitMqClient(uri string, withFunc ...withFunc) *MessageBrokerServer {
+func NewRabbitMqClient(nodes []string, userName string, password string, virtaulHost string, withFunc ...withFunc) *MessageBrokerServer {
 
 	rootCtx, shutdownFn := context.WithCancel(context.Background())
 	childRoutines, childCtx := errgroup.WithContext(rootCtx)
@@ -51,11 +51,14 @@ func NewRabbitMqClient(uri string, withFunc ...withFunc) *MessageBrokerServer {
 		shutdownFn:    shutdownFn,
 		childRoutines: childRoutines,
 		parameters: MessageBrokerParameter{
-			Uri:             uri,
+			Nodes:           nodes,
 			ConcurrentLimit: CONCURRENTLIMIT,
 			RetryCount:      RETRYCOUNT,
 			PrefetchCount:   PREFECTCOUNT,
 			RetryInterval:   RETRY_INTERVAL,
+			Password:        password,
+			UserName:        userName,
+			VirtualHost: virtaulHost,
 		},
 		messageBroker: NewMessageBroker(),
 	}

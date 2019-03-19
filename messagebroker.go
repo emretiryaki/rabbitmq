@@ -1,6 +1,7 @@
 package rabbitmq
 
 import (
+	"fmt"
 	"github.com/streadway/amqp"
 	"time"
 )
@@ -14,11 +15,15 @@ type (
 	}
 
 	MessageBrokerParameter struct {
-		Uri             string
-		PrefetchCount   int
-		RetryCount      int
-		ConcurrentLimit int
-		RetryInterval   time.Duration
+		Nodes             []string
+		PrefetchCount     int
+		RetryCount        int
+		ConcurrentLimit   int
+		RetryInterval     time.Duration
+		UserName          string
+		Password          string
+		selectedNodeIndex int
+		VirtualHost       string
 	}
 
 	BrokerChannel struct {
@@ -43,8 +48,9 @@ func (b *broker) CreateConnection(parameters MessageBrokerParameter) (error) {
 
 	for {
 
-		if b.connection, err = amqp.Dial(b.parameters.Uri); err != nil {
+		if b.connection, err = amqp.Dial(b.chooseNodes()); err != nil {
 			time.Sleep(b.parameters.RetryInterval)
+
 			logConsole("Application Retried To Connect RabbitMq")
 			continue
 		}
@@ -58,6 +64,19 @@ func (b *broker) CreateConnection(parameters MessageBrokerParameter) (error) {
 	return err
 
 }
+
+// TODO: This crashes if we define no servers in our config
+func (b *broker) chooseNodes() string {
+	if b.parameters.selectedNodeIndex== len(b.parameters.Nodes){
+		b.parameters.selectedNodeIndex=0
+	}
+	var selectedNode = b.parameters.Nodes[b.parameters.selectedNodeIndex]
+	b.parameters.selectedNodeIndex++
+  	logConsole(fmt.Sprintf("Started To Listen On Node %s",selectedNode))
+	return   fmt.Sprintf("amqp://%s:%s@%s/%s",b.parameters.UserName,b.parameters.Password, selectedNode,b.parameters.VirtualHost)
+
+}
+
 func (b *broker) onClose() {
 	go func() {
 		err := <-b.connection.NotifyClose(make(chan *amqp.Error))

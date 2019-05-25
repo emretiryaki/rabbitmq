@@ -3,6 +3,7 @@ package rabbitmq
 import (
 	"fmt"
 	"github.com/streadway/amqp"
+	"runtime"
 	"time"
 )
 
@@ -146,12 +147,17 @@ func (m *MessageBrokerServer) RunConsumers() error {
 
 												if !retry || err == nil {
 
-													if err == nil {
-														err = fmt.Errorf("panic occured In Consumer  %q (message %d)", d.CorrelationId, d.Body)
-														retry = false
+													err, ok := r.(error)
+
+													if !ok {
+														retry = false //Because of panic exception
+														err = fmt.Errorf("%v", r)
 													}
 
-													consumer.brokerChannel.channel.Publish(consumer.errorExchangeName, "", false, false, errorPublishMessage(d.CorrelationId, d.Body, m.parameters.RetryCount, err))
+													stack := make([]byte, 4<<10)
+													length := runtime.Stack(stack, false)
+
+													consumer.brokerChannel.channel.Publish(consumer.errorExchangeName, "", false, false, errorPublishMessage(d.CorrelationId, d.Body, m.parameters.RetryCount, err,fmt.Sprintf("[Exception Recover] %v %s\n", err, stack[:length])))
 													d.Ack(false)
 												}
 												return

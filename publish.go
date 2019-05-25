@@ -13,6 +13,8 @@ var (
 	deliveryMode     uint8 = 2
 	headerError            = "Error"
 	headerRetryCount       = "RetryCount"
+	headerStackTrace       = "StackTrace"
+	headerTime       = "Time"
 )
 
 type (
@@ -55,16 +57,13 @@ func convertToPublishMessage(payload interface{}, builders ...builderPublishFunc
 }
 
 
-func errorPublishMessage(correlationId string, payload []byte, retryCount int, err error) amqp.Publishing { //TODO stacktracing
+func errorPublishMessage(correlationId string, payload []byte, retryCount int, err error, stackTracing string) amqp.Publishing {
 
 	headers := make(map[string]interface{})
 	headers[headerRetryCount] = strconv.Itoa(retryCount)
-
-	if err!=nil {
-		headers[headerError] = err.Error()
-	}else {
-		headers[headerError] = err
-	}
+	headers[headerError] = err.Error()
+	headers[headerStackTrace]=stackTracing
+	headers[headerTime]=time.Now().String()
 
 	return amqp.Publishing{
 		MessageId:       getGuid(),

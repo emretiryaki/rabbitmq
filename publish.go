@@ -54,11 +54,17 @@ func convertToPublishMessage(payload interface{}, builders ...builderPublishFunc
 	}
 }
 
-func errorPublishMessage(correlationId string, payload []byte, retryCount int, err error) amqp.Publishing {
+
+func errorPublishMessage(correlationId string, payload []byte, retryCount int, err error) amqp.Publishing { //TODO stacktracing
 
 	headers := make(map[string]interface{})
 	headers[headerRetryCount] = strconv.Itoa(retryCount)
-	headers[headerError] = err.Error()
+
+	if err!=nil {
+		headers[headerError] = err.Error()
+	}else {
+		headers[headerError] = err
+	}
 
 	return amqp.Publishing{
 		MessageId:       getGuid(),

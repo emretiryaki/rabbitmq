@@ -34,7 +34,7 @@ func  logConsole(message string){
 }
 
 
-func convertRabbitmqExchangeType(exchangeType ExchangeType) (string) {
+func convertExchangeType(exchangeType ExchangeType) string {
 
 	var rabbitmqExchangeType string
 	switch exchangeType {
@@ -46,6 +46,9 @@ func convertRabbitmqExchangeType(exchangeType ExchangeType) (string) {
 		break
 	case Topic:
 		rabbitmqExchangeType = amqp.ExchangeTopic
+		break
+	case ConsistentHashing:
+		rabbitmqExchangeType = "x-consistent-hash"
 		break
 	}
 	return rabbitmqExchangeType

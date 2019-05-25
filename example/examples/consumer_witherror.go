@@ -21,7 +21,8 @@ func main() {
 		return nil
 	}
 
-	rabbitClient.AddConsumer("In.CustomerV1", "CustomerV1","",rabbit.Fanout, onConsumed)
+	rabbitClient.AddConsumer("In.CustomerV1").SubscriberExchange("",rabbit.Fanout ,"CustomerV1").HandleConsumer(onConsumed)
+
 	rabbitClient.RunConsumers()
 
 

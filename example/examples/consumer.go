@@ -69,7 +69,8 @@ func main() {
 		return nil
 	}
 
-	rabbitClient.AddConsumer("In.Person_Direct").SubscriberExchange("",rabbit.Direct ,"PersonV1_Direct").HandleConsumer(onConsumed)
+	rabbitClient.AddConsumer("In.Person_Direct").
+		SubscriberExchange("",rabbit.Direct ,"PersonV1_Direct").HandleConsumer(onConsumed)
 	rabbitClient.AddConsumer("In.Person_Fanout").SubscriberExchange("person", rabbit.Fanout,"PersonV3_Fanout",).HandleConsumer(onConsumed2)
 	rabbitClient.AddConsumer("In.Person_Topic").SubscriberExchange("person", rabbit.Topic,"PersonV4_Topic",).HandleConsumer(onConsumed3)
 

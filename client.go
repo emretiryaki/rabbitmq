@@ -21,6 +21,7 @@ const (
 	Direct ExchangeType = 1
 	Fanout ExchangeType = 2
 	Topic  ExchangeType = 3
+	ConsistentHashing ExchangeType = 4
 )
 
 type (
@@ -33,15 +34,15 @@ type (
 		parameters         MessageBrokerParameter
 		shutdownReason     string
 		shutdownInProgress bool
-		consumers          []Consumer
+		consumers          []*Consumer
 		messageBroker      MessageBroker
-		publishers          []Publisher
+		publishers         []Publisher
 	}
 
 	withFunc func(*MessageBrokerServer) error
 )
 
-func NewRabbitMqClient(nodes []string, userName string, password string, virtaulHost string, withFunc ...withFunc) *MessageBrokerServer {
+func NewRabbitMqClient(nodes []string, userName string, password string, virtualHost string, withFunc ...withFunc) *MessageBrokerServer {
 
 	rootCtx, shutdownFn := context.WithCancel(context.Background())
 	childRoutines, childCtx := errgroup.WithContext(rootCtx)
@@ -58,7 +59,7 @@ func NewRabbitMqClient(nodes []string, userName string, password string, virtaul
 			RetryInterval:   RETRY_INTERVAL,
 			Password:        password,
 			UserName:        userName,
-			VirtualHost: virtaulHost,
+			VirtualHost: virtualHost,
 		},
 		messageBroker: NewMessageBroker(),
 	}
@@ -123,18 +124,29 @@ func sendSystemNotification(state string) error {
 
 }
 
-func (consumer *Consumer) createExchange(exchange string, exchangeType ExchangeType) error {
+func (c *Consumer) createExchange(exchange string, exchangeType ExchangeType) *Consumer {
+	 c.brokerChannel.channel.ExchangeDeclare(exchange, convertExchangeType(exchangeType), true, false, false, false, nil)
 
-	var err = consumer.brokerChannel.channel.ExchangeDeclare(exchange, convertRabbitmqExchangeType(exchangeType), true, false, false, false, nil)
-	if err != nil {
-		return err
-	}
-	return nil
+	 return c
+
 }
 
-func (consumer *Consumer) createQueue(destinationExchange string, queueName string, routingKey string, exchangeType ExchangeType) {
+func (c *Consumer) createQueue()  *Consumer {
+	 c.brokerChannel.channel.QueueDeclare(c.queueName, true, false, false, false, nil)
+	return c
 
-	consumer.brokerChannel.channel.ExchangeDeclare(destinationExchange, convertRabbitmqExchangeType(exchangeType), true, false, false, false, nil)
-	q, _ := consumer.brokerChannel.channel.QueueDeclare(queueName, true, false, false, false, nil)
-	consumer.brokerChannel.channel.QueueBind(q.Name, routingKey, destinationExchange, false, nil)
+}
+
+func (c *Consumer) exchangeBind(destinationExchange string, queueName string, routingKey string, exchangeType ExchangeType) *Consumer {
+	c.brokerChannel.channel.ExchangeDeclare(destinationExchange, convertExchangeType(exchangeType), true, false, false, false, nil)
+	c.brokerChannel.channel.QueueBind(queueName, routingKey, destinationExchange, false, nil)
+	return c
+}
+
+func (c *Consumer) createErrorQueueAndBind()  *Consumer {
+	c.brokerChannel.channel.ExchangeDeclare(c.errorExchangeName, "fanout", true, false, false, false, nil)
+	q, _ := c.brokerChannel.channel.QueueDeclare(c.errorQueueName, true, false, false, false, nil)
+	c.brokerChannel.channel.QueueBind(q.Name, "",c.errorExchangeName, false, nil)
+	return c
+
 }

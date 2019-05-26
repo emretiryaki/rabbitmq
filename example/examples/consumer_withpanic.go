@@ -26,17 +26,15 @@ func main() {
 	onConsumed := func(message rabbit.Message) error {
 
 		var consumeMessage PersonV3
-		var err = json.Unmarshal(message.Payload, &consumeMessage)
-		if err != nil {
-			return err
-		}
+		json.Unmarshal(message.Payload, &consumeMessage)
+		panic("panic")
+
 		time.Sleep(1 * time.Second)
 		fmt.Println(time.Now().Format("Mon, 02 Jan 2006 15:04:05 "), " Message:", consumeMessage)
-
-		panic("panic")
 		return nil
 	}
-	rabbitClient.AddConsumer("In.Person3", "PersonV3","",rabbit.Fanout, onConsumed)
+
+	rabbitClient.AddConsumer("In.Person3").SubscriberExchange("",rabbit.Fanout ,"PersonV3").HandleConsumer(onConsumed)
 	rabbitClient.RunConsumers()
 
 }

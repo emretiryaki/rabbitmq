@@ -11,7 +11,7 @@ type (
 		CreateChannel() (*BrokerChannel, error)
 		CreateConnection(parameters MessageBrokerParameter) error
 		SignalConnectionStatus(status bool)
-		SignalConnection() (chan bool)
+		SignalConnection() chan bool
 	}
 
 	MessageBrokerParameter struct {
@@ -48,7 +48,7 @@ func (b *broker) CreateConnection(parameters MessageBrokerParameter) (error) {
 
 	for {
 
-		if b.connection, err = amqp.Dial(b.chooseNodes()); err != nil {
+		if b.connection, err = amqp.Dial(b.chooseNode()); err != nil {
 			time.Sleep(b.parameters.RetryInterval)
 
 			logConsole("Application Retried To Connect RabbitMq")
@@ -66,7 +66,7 @@ func (b *broker) CreateConnection(parameters MessageBrokerParameter) (error) {
 }
 
 // TODO: This crashes if we define no servers in our config
-func (b *broker) chooseNodes() string {
+func (b *broker) chooseNode() string {
 	if b.parameters.selectedNodeIndex== len(b.parameters.Nodes){
 		b.parameters.selectedNodeIndex=0
 	}
@@ -111,7 +111,7 @@ func (b *broker) SignalConnectionStatus(status bool) {
 	}()
 }
 
-func (b *broker) SignalConnection() (chan bool) {
+func (b *broker) SignalConnection() chan bool {
 	return b.connNotifyChannel
 }
 

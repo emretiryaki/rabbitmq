@@ -2,21 +2,21 @@ package rabbitmq
 
 import (
 	"fmt"
-	"time"
 	"github.com/streadway/amqp"
+	"runtime"
+	"time"
 )
 
 type (
 	Consumer struct {
 		queueName         string
-		exchangeName      string
-		routingKey        string
 		handleConsumer    handleConsumer
 		errorQueueName    string
 		errorExchangeName string
 		brokerChannel     *BrokerChannel
 		startConsumerCn   chan bool
-		exchangeType      ExchangeType
+		singleGoroutine   bool
+		exchanges		  []exchange
 	}
 	Message struct {
 		Payload       []byte
@@ -25,20 +25,24 @@ type (
 		Timestamp     time.Time
 	}
 
+	exchange struct {
+		exchangeName      string
+		routingKey        string
+		exchangeType      ExchangeType
+	}
+
 	handleConsumer func(message Message) error
+
 )
 
-func (m *MessageBrokerServer) AddConsumer(queueName string, exchangeName string, routingKey string, exchangeType ExchangeType, handleConsumer handleConsumer) {
+func (m *MessageBrokerServer) AddConsumer(queueName string) *Consumer {
 
-	var consumer = Consumer{
+	var consumer = &Consumer{
 		queueName:         queueName,
-		routingKey:        routingKey,
-		exchangeName:      exchangeName,
-		handleConsumer:    handleConsumer,
 		errorQueueName:    queueName + ERRORPREFIX,
 		errorExchangeName: queueName + ERRORPREFIX,
 		startConsumerCn:   make(chan bool),
-		exchangeType:      exchangeType,
+		singleGoroutine : false,
 	}
 
 	var isAlreadyDeclareQueue bool
@@ -51,8 +55,37 @@ func (m *MessageBrokerServer) AddConsumer(queueName string, exchangeName string,
 	if !isAlreadyDeclareQueue {
 		m.consumers = append(m.consumers, consumer)
 	}
-
+	return consumer
 }
+
+func (c *Consumer) HandleConsumer (consumer handleConsumer)  *Consumer {
+	c.handleConsumer = consumer
+	return c
+}
+
+func (c *Consumer) WithSingleGoroutine (value bool)  *Consumer {
+	c.singleGoroutine = value
+	return c
+}
+
+func (c *Consumer) SubscriberExchange (routingKey string,exchangeType ExchangeType, exchangeName string)  *Consumer {
+
+	var isAlreadyDeclareExchange bool
+
+	for _, item := range c.exchanges{
+		if item.exchangeName == exchangeName {
+			isAlreadyDeclareExchange = true
+		}
+	}
+
+	if isAlreadyDeclareExchange {
+		return c
+	}
+
+	c.exchanges = append(c.exchanges,exchange{exchangeName:exchangeName,exchangeType:exchangeType,routingKey:routingKey})
+	return c
+}
+
 
 func (m *MessageBrokerServer) RunConsumers() error {
 
@@ -84,56 +117,39 @@ func (m *MessageBrokerServer) RunConsumers() error {
 				case isConnected := <-consumer.startConsumerCn:
 
 					if isConnected {
-						logConsole(consumer.queueName + " started to listen rabbitmq")
+
+						logConsole(consumer.queueName + " started to listen rabbitMq")
 						var err error
 						if consumer.brokerChannel, err = m.messageBroker.CreateChannel(); err != nil {
 							panic(err)
 						}
 
-						consumer.createExchange(consumer.exchangeName, consumer.exchangeType)
-						consumer.createQueue(consumer.exchangeName, consumer.queueName, consumer.routingKey, consumer.exchangeType)
-						consumer.createQueue(consumer.errorQueueName, consumer.errorExchangeName, "", Fanout)
+						consumer.createQueue().createErrorQueueAndBind()
+
+						for _, item := range consumer.exchanges {
+
+							consumer.
+								createExchange(item.exchangeName, item.exchangeType).
+								exchangeBind(item.exchangeName, consumer.queueName, item.routingKey, item.exchangeType)
+
+						}
 
 						consumer.brokerChannel.channel.Qos(m.parameters.PrefetchCount, 0, false)
 
 						delivery, _ := consumer.listenToQueue(consumer.queueName)
 
-						for i := 0; i < m.parameters.PrefetchCount; i++ {
+						if consumer.singleGoroutine {
+							m.run(delivery, consumer)
 
-							go func() {
+						} else {
+							for i := 0; i < m.parameters.PrefetchCount; i++ {
 
-								for d := range delivery {
-
-									Do(func(attempt int) (retry bool, err error) {
-
-										retry = attempt < m.parameters.RetryCount
-
-										defer func() {
-
-											if r := recover(); r != nil {
-												if !retry {
-													consumer.brokerChannel.channel.Publish(consumer.errorExchangeName, "", false, false, errorPublishMessage(d.CorrelationId, d.Body, m.parameters.RetryCount, err))
-													d.Ack(false)
-												}
-												if err == nil {
-													err = fmt.Errorf("panic occured In Consumer  %q (message %d)", d.CorrelationId, d.Body)
-													consumer.brokerChannel.channel.Publish(consumer.errorExchangeName, "", false, false, errorPublishMessage(d.CorrelationId, d.Body, m.parameters.RetryCount, err))
-													d.Ack(false)
-													retry = false
-												}
-												return
-											}
-										}()
-										err = consumer.handleConsumer(Message{CorrelationId: d.CorrelationId, Payload: d.Body, MessageId: d.MessageId, Timestamp: d.Timestamp})
-										if err != nil {
-											panic(err)
-										}
-										d.Ack(false)
-										return
-									})
-								}
-							}()
+								go func() {
+									m.run(delivery, consumer)
+								}()
+							}
 						}
+
 					}
 				}
 			}
@@ -145,9 +161,50 @@ func (m *MessageBrokerServer) RunConsumers() error {
 	return m.childRoutines.Wait()
 }
 
-func (consumer Consumer) listenToQueue(queueName string) (<-chan amqp.Delivery, error) {
+func (m *MessageBrokerServer) run(delivery <-chan amqp.Delivery, consumer *Consumer) {
+	for d := range delivery {
 
-	msg, err := consumer.brokerChannel.channel.Consume(queueName,
+		Do(func(attempt int) (retry bool, err error) {
+
+			retry = attempt < m.parameters.RetryCount
+
+			defer func() {
+
+				if r := recover(); r != nil {
+
+					if !retry || err == nil {
+
+						err, ok := r.(error)
+
+						if !ok {
+							retry = false //Because of panic exception
+							err = fmt.Errorf("%v", r)
+						}
+
+						stack := make([]byte, 4<<10)
+						length := runtime.Stack(stack, false)
+
+						consumer.brokerChannel.channel.Publish(consumer.errorExchangeName, "", false, false, errorPublishMessage(d.CorrelationId, d.Body, m.parameters.RetryCount, err, fmt.Sprintf("[Exception Recover] %v %s\n", err, stack[:length])))
+						d.Ack(false)
+					}
+					return
+				}
+			}()
+			err = consumer.handleConsumer(Message{CorrelationId: d.CorrelationId, Payload: d.Body, MessageId: d.MessageId, Timestamp: d.Timestamp})
+			if err != nil {
+				panic(err)
+			}
+			d.Ack(false)
+			return
+		})
+	}
+}
+
+
+
+func (c Consumer) listenToQueue(queueName string) (<-chan amqp.Delivery, error) {
+
+	msg, err := c.brokerChannel.channel.Consume(queueName,
 		"",
 		false,
 		false,

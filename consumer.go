@@ -15,6 +15,7 @@ type (
 		errorExchangeName string
 		brokerChannel     *BrokerChannel
 		startConsumerCn   chan bool
+		singleGoroutine   bool
 		exchanges		  []exchange
 	}
 	Message struct {
@@ -41,6 +42,7 @@ func (m *MessageBrokerServer) AddConsumer(queueName string) *Consumer {
 		errorQueueName:    queueName + ERRORPREFIX,
 		errorExchangeName: queueName + ERRORPREFIX,
 		startConsumerCn:   make(chan bool),
+		singleGoroutine : false,
 	}
 
 	var isAlreadyDeclareQueue bool
@@ -61,6 +63,10 @@ func (c *Consumer) HandleConsumer (consumer handleConsumer)  *Consumer {
 	return c
 }
 
+func (c *Consumer) WithSingleGoroutine (value bool)  *Consumer {
+	c.singleGoroutine = value
+	return c
+}
 
 func (c *Consumer) SubscriberExchange (routingKey string,exchangeType ExchangeType, exchangeName string)  *Consumer {
 
@@ -120,59 +126,30 @@ func (m *MessageBrokerServer) RunConsumers() error {
 
 						consumer.createQueue().createErrorQueueAndBind()
 
-						for _,item := range consumer.exchanges{
+						for _, item := range consumer.exchanges {
 
 							consumer.
 								createExchange(item.exchangeName, item.exchangeType).
 								exchangeBind(item.exchangeName, consumer.queueName, item.routingKey, item.exchangeType)
+
 						}
 
 						consumer.brokerChannel.channel.Qos(m.parameters.PrefetchCount, 0, false)
 
 						delivery, _ := consumer.listenToQueue(consumer.queueName)
 
-						for i := 0; i < m.parameters.PrefetchCount; i++ {
+						if consumer.singleGoroutine {
+							m.run(delivery, consumer)
 
-							go func() {
+						} else {
+							for i := 0; i < m.parameters.PrefetchCount; i++ {
 
-								for d := range delivery {
-
-									Do(func(attempt int) (retry bool, err error) {
-
-										retry = attempt < m.parameters.RetryCount
-
-										defer func() {
-
-											if r := recover(); r != nil {
-
-												if !retry || err == nil {
-
-													err, ok := r.(error)
-
-													if !ok {
-														retry = false //Because of panic exception
-														err = fmt.Errorf("%v", r)
-													}
-
-													stack := make([]byte, 4<<10)
-													length := runtime.Stack(stack, false)
-
-													consumer.brokerChannel.channel.Publish(consumer.errorExchangeName, "", false, false, errorPublishMessage(d.CorrelationId, d.Body, m.parameters.RetryCount, err,fmt.Sprintf("[Exception Recover] %v %s\n", err, stack[:length])))
-													d.Ack(false)
-												}
-												return
-											}
-										}()
-										err = consumer.handleConsumer(Message{CorrelationId: d.CorrelationId, Payload: d.Body, MessageId: d.MessageId, Timestamp: d.Timestamp})
-										if err != nil {
-											panic(err)
-										}
-										d.Ack(false)
-										return
-									})
-								}
-							}()
+								go func() {
+									m.run(delivery, consumer)
+								}()
+							}
 						}
+
 					}
 				}
 			}
@@ -183,6 +160,47 @@ func (m *MessageBrokerServer) RunConsumers() error {
 
 	return m.childRoutines.Wait()
 }
+
+func (m *MessageBrokerServer) run(delivery <-chan amqp.Delivery, consumer *Consumer) {
+	for d := range delivery {
+
+		Do(func(attempt int) (retry bool, err error) {
+
+			retry = attempt < m.parameters.RetryCount
+
+			defer func() {
+
+				if r := recover(); r != nil {
+
+					if !retry || err == nil {
+
+						err, ok := r.(error)
+
+						if !ok {
+							retry = false //Because of panic exception
+							err = fmt.Errorf("%v", r)
+						}
+
+						stack := make([]byte, 4<<10)
+						length := runtime.Stack(stack, false)
+
+						consumer.brokerChannel.channel.Publish(consumer.errorExchangeName, "", false, false, errorPublishMessage(d.CorrelationId, d.Body, m.parameters.RetryCount, err, fmt.Sprintf("[Exception Recover] %v %s\n", err, stack[:length])))
+						d.Ack(false)
+					}
+					return
+				}
+			}()
+			err = consumer.handleConsumer(Message{CorrelationId: d.CorrelationId, Payload: d.Body, MessageId: d.MessageId, Timestamp: d.Timestamp})
+			if err != nil {
+				panic(err)
+			}
+			d.Ack(false)
+			return
+		})
+	}
+}
+
+
 
 func (c Consumer) listenToQueue(queueName string) (<-chan amqp.Delivery, error) {
 

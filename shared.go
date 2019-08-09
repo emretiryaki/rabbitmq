@@ -50,6 +50,9 @@ func convertExchangeType(exchangeType ExchangeType) string {
 	case ConsistentHashing:
 		rabbitmqExchangeType = "x-consistent-hash"
 		break
+	case XDelayedMessage:
+		rabbitmqExchangeType = "x-delayed-message"
+		break
 	}
 	return rabbitmqExchangeType
 }

@@ -4,7 +4,7 @@ RabbitMq Wrapper is the a client API for RabbitMQ.
 * A  wrapper over [amqp](https://github.com/streadway/amqp) exchanges and queues.
 * In memory retries for consuming messages when an error occured
 * CorrelationId and MessageId structure
-* Exchange Types With Direct, Fanout, Topic, ConsistentHashing 
+* Exchange Types With Direct, Fanout, Topic, ConsistentHashing,  XDelayedMessage
 * Retry policy (immediately , interval)
 * Multiple consumers In a single process
 * Create goroutines and consume messages asynchronously 
@@ -12,6 +12,7 @@ RabbitMq Wrapper is the a client API for RabbitMQ.
 * Retry to connect another node  When RabbitMq Node is Down or Broken Connection
 * Add stack trace on the message header if the error occurred when the message is consumed
 * Some extra features while publishing message  (will be added) 
+Add support for [rabbitmq-delayed-message-exchange](https://github.com/rabbitmq/rabbitmq-delayed-message-exchange) plugin
 
 To connect to a RabbitMQ broker...
 
@@ -92,3 +93,18 @@ To connect to a RabbitMQ broker with retry policy
         		SubscriberExchange("1", rabbit.ConsistentHashing,OrderLineCancelled).
         		WithSingleGoroutine(true).
         		HandleConsumer(onConsumed2)
+
+Use `rabbitmq_delayed_message_exchange` plugin
+
+         args := make(amqp.Table)
+        args["x-delayed-type"] = "direct"
+
+         rabbitClient.AddConsumer("In.Person").
+				SubscriberExchangeWithArguments(
+					"Person.*",
+					rabbitmq.XDelayedMessage,
+					"delay-messages",
+					args,
+				).
+				HandleConsumer(onConsumed2)
+				

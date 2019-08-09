@@ -2,6 +2,7 @@ package rabbitmq
 
 import (
 	"fmt"
+	"github.com/streadway/amqp"
 	"golang.org/x/net/context"
 	"golang.org/x/sync/errgroup"
 	"net"
@@ -22,6 +23,7 @@ const (
 	Fanout ExchangeType = 2
 	Topic  ExchangeType = 3
 	ConsistentHashing ExchangeType = 4
+	XDelayedMessage   ExchangeType = 5
 )
 
 type (
@@ -124,8 +126,8 @@ func sendSystemNotification(state string) error {
 
 }
 
-func (c *Consumer) createExchange(exchange string, exchangeType ExchangeType) *Consumer {
-	 c.brokerChannel.channel.ExchangeDeclare(exchange, convertExchangeType(exchangeType), true, false, false, false, nil)
+func (c *Consumer) createExchange(exchange string, exchangeType ExchangeType, args amqp.Table) *Consumer {
+	 c.brokerChannel.channel.ExchangeDeclare(exchange, convertExchangeType(exchangeType), true, false, false, false, args)
 
 	 return c
 

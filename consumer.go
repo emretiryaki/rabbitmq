@@ -29,6 +29,7 @@ type (
 		exchangeName      string
 		routingKey        string
 		exchangeType      ExchangeType
+		args         	  amqp.Table
 	}
 
 	handleConsumer func(message Message) error
@@ -86,6 +87,28 @@ func (c *Consumer) SubscriberExchange (routingKey string,exchangeType ExchangeTy
 	return c
 }
 
+func (c *Consumer) SubscriberExchangeWithArguments(routingKey string, exchangeType ExchangeType, exchangeName string, args amqp.Table) *Consumer {
+
+	var isAlreadyDeclareExchange bool
+
+	for _, item := range c.exchanges {
+	   if item.exchangeName == exchangeName {
+		   isAlreadyDeclareExchange = true
+	   }
+   }
+
+	if isAlreadyDeclareExchange {
+	   return c
+   }
+
+	c.exchanges = append(c.exchanges, exchange{
+	   exchangeName: exchangeName,
+	   exchangeType: exchangeType,
+	   routingKey:   routingKey,
+	   args:         args,
+   })
+   return c
+}
 
 func (m *MessageBrokerServer) RunConsumers() error {
 
@@ -129,7 +152,7 @@ func (m *MessageBrokerServer) RunConsumers() error {
 						for _, item := range consumer.exchanges {
 
 							consumer.
-								createExchange(item.exchangeName, item.exchangeType).
+								createExchange(item.exchangeName, item.exchangeType, item.args).
 								exchangeBind(item.exchangeName, consumer.queueName, item.routingKey, item.exchangeType)
 
 						}

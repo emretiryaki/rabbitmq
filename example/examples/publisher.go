@@ -3,7 +3,7 @@ package main
 import (
 	rabbit "github.com/emretiryaki/rabbitmq"
 	"golang.org/x/net/context"
-	"golang.org/x/tools/go/ssa/interp/testdata/src/fmt"
+	"fmt"
 )
 
 func main() {

@@ -5,7 +5,7 @@ RabbitMq Wrapper is the a client API for RabbitMQ.
 * In memory retries for consuming messages when an error occured
 * CorrelationId and MessageId structure
 * Exchange Types With Direct, Fanout, Topic, ConsistentHashing,  XDelayedMessage
-* Retry policy (immediately , interval)
+* Retry policy (immediately)
 * Multiple consumers In a single process
 * Create goroutines and consume messages asynchronously 
 * Disable consume messages asynchronously if you want
@@ -22,7 +22,7 @@ To connect to a RabbitMQ broker with retry policy
  * Consumer retries two times immediately if an error occured
 
       	var rabbitClient=rabbit.NewRabbitMqClient([]string{"127.0.0.1","127.0.0.2"},"guest","guest","/virtualhost",
-                                                  rabbit.RetryCount(2,time.Duration(0)))
+                                                  rabbit.RetryCount(2))
   
  * Create goroutines and consume messages asynchronously using PrefetchCount Prefix. 
  Create as number of  PrefetchCount as goroutines .
@@ -32,7 +32,14 @@ To connect to a RabbitMQ broker with retry policy
                                                     
  To send a message 
         
-        // Added
+        //   rabbitClient.AddPublisher("PersonV1_Direct", rabbit.Direct, PersonV1{})
+           
+           	var err = rabbitClient.Publish(context.TODO(), "123", PersonV1{
+           		Name:    "John",
+           		Surname: "Jack",
+           		City:    City{},
+           		Count:   1,
+           	})
         
  To consume a message
  

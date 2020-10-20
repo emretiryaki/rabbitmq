@@ -32,9 +32,8 @@ To connect to a RabbitMQ broker with retry policy
                                                     
  To send a message 
         
-        //   rabbitClient.AddPublisher("PersonV1_Direct", rabbit.Direct, PersonV1{})
-           
-           	var err = rabbitClient.Publish(context.TODO(), "123", PersonV1{
+       rabbitClient.AddPublisher("PersonV1_Direct", rabbit.Direct, PersonV1{})
+       var err = rabbitClient.Publish(context.TODO(), "123", PersonV1{
            		Name:    "John",
            		Surname: "Jack",
            		City:    City{},

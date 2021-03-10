@@ -13,11 +13,11 @@ import (
 )
 
 var (
-	ERRORPREFIX     = "_error"
-	CONCURRENTLIMIT = 1
-	RETRYCOUNT      = 0
-	PREFECTCOUNT    = 1
-	reconnectDelay  = 2 * time.Second
+	errorQueuePrefix = "_error"
+	concurrentLimit  = 1
+	retryCount       = 0
+	prefectCount     = 1
+	reconnectDelay   = 2 * time.Second
 )
 
 const (
@@ -110,9 +110,9 @@ func NewRabbitMqClient(nodes []string, userName string, password string, virtual
 		},
 		parameters: MessageBrokerParameter{
 			Nodes:           nodes,
-			ConcurrentLimit: CONCURRENTLIMIT,
-			RetryCount:      RETRYCOUNT,
-			PrefetchCount:   PREFECTCOUNT,
+			ConcurrentLimit: concurrentLimit,
+			RetryCount:      retryCount,
+			PrefetchCount:   prefectCount,
 			Password:        password,
 			UserName:        userName,
 			VirtualHost:     virtualHost,
@@ -213,8 +213,8 @@ func (c *Client) AddConsumer(queueName string) *Consumer {
 
 	var consumerDefination = &Consumer{
 		queueName:         queueName,
-		errorQueueName:    queueName + ERRORPREFIX,
-		errorExchangeName: queueName + ERRORPREFIX,
+		errorQueueName:    queueName + errorQueuePrefix,
+		errorExchangeName: queueName + errorQueuePrefix,
 		startConsumerCn:   make(chan bool),
 		singleGoroutine:   false,
 	}
@@ -340,9 +340,10 @@ func (c *Client) Publish(ctx context.Context, routingKey string, payload interfa
 	)
 
 	for _, item := range c.publisherBuilder.publishers {
+		var tempPublisher = item
 		for _, payloadType := range item.payloadTypes {
 			if payloadType == reflect.TypeOf(payload) {
-				publisher = &item
+				publisher = &tempPublisher
 			}
 		}
 	}

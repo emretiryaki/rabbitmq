@@ -1,25 +1,21 @@
 # rabbitmq Wrapper
-RabbitMq Wrapper is the a client API for RabbitMQ. 
+RabbitMq Wrapper is the client API for RabbitMQ. 
 
 * A  wrapper over [amqp](https://github.com/streadway/amqp) exchanges and queues.
-* In memory retries for consuming messages when an error occured
+* In memory retries for consuming messages when an error occurred
 * CorrelationId and MessageId structure
-* Exchange Types With Direct, Fanout, Topic, ConsistentHashing,  XDelayedMessage
-* Retry policy (immediately)
-* Multiple consumers In a single process
+* Retry policy (immediately,delayed)
 * Create goroutines and consume messages asynchronously 
-* Disable consume messages asynchronously if you want
-* Retry to connect another node  When RabbitMq Node is Down or Broken Connection
+* Retry to connect another node  when RabbitMq Node is Down or Broken Connection
 * Add stack trace on the message header if the error occurred when the message is consumed
-* Some extra features while publishing message  (will be added) 
-Add support for [rabbitmq-delayed-message-exchange](https://github.com/rabbitmq/rabbitmq-delayed-message-exchange) plugin
+* publishing message
 
 To connect to a RabbitMQ broker...
 
     	var rabbitClient=rabbit.NewRabbitMqClient([]string{"127.0.0.1","127.0.0.2"},"guest","guest","/virtualhost")
 
 To connect to a RabbitMQ broker with retry policy 
- * Consumer retries two times immediately if an error occured
+ * Consumer retries two times immediately if an error occurred
 
       	var rabbitClient=rabbit.NewRabbitMqClient([]string{"127.0.0.1","127.0.0.2"},"guest","guest","/virtualhost",
                                                   rabbit.RetryCount(2))
@@ -100,17 +96,4 @@ To connect to a RabbitMQ broker with retry policy
         		WithSingleGoroutine(true).
         		HandleConsumer(onConsumed2)
 
-Use `rabbitmq_delayed_message_exchange` plugin
-
-         args := make(amqp.Table)
-        args["x-delayed-type"] = "direct"
-
-         rabbitClient.AddConsumer("In.Person").
-				SubscriberExchangeWithArguments(
-					"Person.*",
-					rabbitmq.XDelayedMessage,
-					"delay-messages",
-					args,
-				).
-				HandleConsumer(onConsumed2)
 				
